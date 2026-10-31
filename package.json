@@ -4,10 +4,15 @@
   "version": "0.1.0",
   "scripts": {
     "build": "tsc",
-    "test": "npm run build && node dist/test/ladder-rating.test.js && node dist/test/ladder-match.test.js && node dist/test/ladder-status.test.js && node dist/test/ladder-submission.test.js"
+    "test": "npm run build && node dist/test/ladder-rating.test.js && node dist/test/ladder-match.test.js && node dist/test/ladder-status.test.js && node dist/test/ladder-submission.test.js && node dist/test/public-address.test.js && node dist/test/public-fetch.test.js"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
     "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "ipaddr.js": "2.2.0",
+    "undici": "7.30.1"
   }
 }
