@@ -8,7 +8,7 @@ async function loadLadder(){
  try{
   const response=await fetch(api,{headers:{apikey:publishableKey,Authorization:'Bearer '+publishableKey}});
   if(!response.ok)throw Error('无法读取天梯');
-  const entries:Entry[]=await response.json();status.textContent=entries.length?'':'暂时还没有通过评测的选手。';
+  const entries:Entry[]=await response.json();window.dispatchEvent(new CustomEvent('qiling-ladder',{detail:entries}));status.textContent=entries.length?'':'暂时还没有通过评测的选手。';
   for(const [index,entry] of entries.entries()){
    const row=document.createElement('div');row.className='ladder-row';
    const identity=document.createElement('div');identity.className='rank-name';
