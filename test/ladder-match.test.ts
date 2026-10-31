@@ -13,6 +13,11 @@ const invalid:LadderPlayer={async choose(phase,state,legal){
 void (async()=>{
   await assert.rejects(playLadderMatch([invalid,valid]),/无效行动/);
   await assert.rejects(playLadderMatch([{async choose(){return {weights:[0,0,0,100]};}},valid]),/概率/);
+  const previousNow=Date.now;let time=0;Date.now=()=>time;
+  try {
+    const slow:LadderPlayer={async choose(){time=15*60*1000;return {weights:[25,25,25,25]};}};
+    await assert.rejects(playLadderMatch([slow,valid]),/超时/);
+  } finally { Date.now=previousNow; }
   const result=await playLadderMatch([valid,valid],()=>0);
   assert.ok(result.winner===0||result.winner===1);
 })().catch(error=>{console.error(error);process.exitCode=1;});
