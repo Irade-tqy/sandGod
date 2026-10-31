@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env*
+*.pt
+*.pth
+*.onnx
+*.wasm
+uploads/
