@@ -1,4 +1,4 @@
-import {lookup,LookupAddress} from 'node:dns';
+import {LookupAddress} from 'node:dns';
 import {LookupFunction} from 'node:net';
 import {Agent,fetch as undiciFetch} from 'undici';
 import {isPublicAddress,publicEndpoint} from './public-address';
@@ -15,13 +15,27 @@ export function limitResponse(response:Response):Response {
 }
 
 type ResolveAll=(hostname:string,callback:(error:NodeJS.ErrnoException|null,addresses:LookupAddress[])=>void)=>void;
-export function createSafeLookup(resolve:ResolveAll=(hostname,callback)=>lookup(hostname,{all:true,verbatim:true},callback)):LookupFunction {
+export async function resolvePublicDns(hostname:string,fetcher:typeof fetch=globalThis.fetch):Promise<LookupAddress[]> {
+  const query=async(type:1|28)=>{
+    const url=new URL('https://1.1.1.1/dns-query');url.searchParams.set('name',hostname);url.searchParams.set('type',String(type));
+    const response=await fetcher(url,{headers:{accept:'application/dns-json'},redirect:'error',signal:AbortSignal.timeout(5000)});
+    if(!response.ok)throw Error('公网 DNS 不可用');
+    const data=await limitResponse(response).json() as {Status?:unknown;Answer?:unknown};
+    if(data.Status!==0 || (data.Answer!==undefined&&!Array.isArray(data.Answer)))throw Error('公网 DNS 查询失败');
+    return ((data.Answer??[]) as {type?:unknown;data?:unknown}[]).filter(item=>item.type===type&&typeof item.data==='string').map(item=>({address:item.data as string,family:type===1?4:6}));
+  };
+  return (await Promise.all([query(1),query(28)])).flat();
+}
+
+export function createSafeLookup(resolve:ResolveAll=(hostname,callback)=>{void resolvePublicDns(hostname).then(addresses=>callback(null,addresses),error=>callback(error instanceof Error?error:Error('公网 DNS 查询失败'),[]));}):LookupFunction {
   return (hostname,options,callback)=>{
     resolve(hostname,(error,addresses)=>{
       if (error) return callback(error,'',0);
       if (!addresses.length || addresses.some(item=>!isPublicAddress(item.address))) return callback(new Error('MCP 地址解析到了非公网地址'),'',0);
-      if (options.all) return callback(null,addresses);
-      return callback(null,addresses[0].address,addresses[0].family);
+      const selected=options.family?addresses.filter(item=>item.family===options.family):addresses;
+      if(!selected.length)return callback(new Error('没有可用的公网地址'),'',0);
+      if (options.all) return callback(null,selected);
+      return callback(null,selected[0].address,selected[0].family);
     });
   };
 }

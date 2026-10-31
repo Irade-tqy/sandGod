@@ -19,6 +19,7 @@ export function publicEndpoint(value:string):URL {
   try { url=new URL(value); } catch { throw Error('MCP 地址无效'); }
   if (url.protocol!=='https:' || url.username || url.password || url.hash) throw Error('MCP 地址必须是不含凭据的 HTTPS 地址');
   const hostname=url.hostname.replace(/^\[|\]$/g,'');
+  if(hostname==='localhost'||hostname.endsWith('.localhost')||hostname.endsWith('.local'))throw Error('MCP 地址不能指向内网');
   if (isIP(hostname) && !isPublicAddress(hostname)) throw Error('MCP 地址不能指向内网');
   return url;
 }
