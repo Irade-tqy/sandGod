@@ -8,7 +8,7 @@ export async function runWasm(wasm:Uint8Array, input:unknown):Promise<unknown> {
   const message=Buffer.from(JSON.stringify(input)+'\n');
   if(message.length>MAX_INPUT) throw Error('对局输入过大');
   const name='sandgod-eval-'+randomUUID();
-  const args=['run','--rm','--name',name,'--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--pids-limit','64','--memory','512m','--cpus','1','--tmpfs','/tmp:rw,nosuid,nodev,noexec,size=32m','-i','sandgod-wasm-runtime:50.0.1','sh','-c','head -c "$1" > /tmp/entry.wasm && exec wasmtime run -W fuel=100000000,max-memory-size=67108864 /tmp/entry.wasm','sandbox',String(wasm.length)];
+  const args=['run','--rm','--name',name,'--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--pids-limit','64','--memory','512m','--cpus','1','--tmpfs','/tmp:rw,nosuid,nodev,noexec,size=32m','-i','sandgod-wasm-runtime:50.0.1','sh','-c','head -c "$1" > /tmp/entry.wasm && exec wasmtime run -C cache=n -W fuel=100000000,max-memory-size=67108864 /tmp/entry.wasm','sandbox',String(wasm.length)];
   return new Promise((resolve,reject)=>{
     const child=spawn('docker',args,{stdio:['pipe','pipe','pipe']});
     const chunks:Buffer[]=[];let size=0, failure:string|null=null, settled=false;
