@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "scripts": {
     "build": "tsc && tsc -p tsconfig.client.json && cp node_modules/socket.io-client/dist/socket.io.min.js public/socket.io.min.js",
-    "test": "npm run build && node dist/test/strategy-protocol.test.js && node dist/test/ladder-rating.test.js && node dist/test/ladder-match.test.js && node dist/test/ladder-game.test.js && node dist/test/challenge.test.js && node dist/test/ladder-store.test.js && node dist/test/ladder-status.test.js && node dist/test/ladder-submission.test.js && node dist/test/public-address.test.js && node dist/test/public-fetch.test.js && node dist/test/server.test.js"
+    "test": "npm run build && node dist/test/strategy-protocol.test.js && node dist/test/ladder-rating.test.js && node dist/test/ladder-match.test.js && node dist/test/evaluate-ladder.test.js && node dist/test/ladder-game.test.js && node dist/test/challenge.test.js && node dist/test/ladder-store.test.js && node dist/test/ladder-status.test.js && node dist/test/ladder-submission.test.js && node dist/test/public-address.test.js && node dist/test/public-fetch.test.js && node dist/test/server.test.js"
   },
   "devDependencies": {
     "@types/express": "5.0.6",
