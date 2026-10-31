@@ -6,6 +6,7 @@ export class LadderStore {
   private async request(path:string,options:RequestInit={}){
     const response=await fetch(ORIGIN+path,{...options,redirect:'error',headers:{apikey:this.secret,Authorization:'Bearer '+this.secret,'Content-Type':'application/json',Prefer:'return=representation'}});
     if(!response.ok)throw Error('天梯数据库暂时不可用');
+    if(response.status===204)return null;
     return await response.json() as unknown;
   }
   async getActiveMcp(id:string):Promise<{id:string;endpoint:string}|null>{
@@ -19,5 +20,9 @@ export class LadderStore {
     if(!UUID.test(id)||!['online','offline'].includes(status))throw Error('天梯请求无效');
     const result=await this.request('/rest/v1/arena_players?id=eq.'+id+'&status=eq.active&kind=eq.mcp',{method:'PATCH',body:JSON.stringify({mcp_status:status})});
     if(!Array.isArray(result)||result.length!==1)throw Error('天梯选手不可用');
+  }
+  async recordMatch(matchId:string,first:string,second:string,winner:string){
+    if(![matchId,first,second,winner].every(id=>UUID.test(id))||first===second||(winner!==first&&winner!==second))throw Error('天梯对局结果无效');
+    await this.request('/rest/v1/rpc/arena_record_match',{method:'POST',body:JSON.stringify({p_match_id:matchId,p_first:first,p_second:second,p_winner:winner})});
   }
 }

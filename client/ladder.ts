@@ -4,6 +4,7 @@ const publishableKey="sb_publishable_VSzDyfevnd1CAiD_8sb6dg_UgnUgree";
 type Entry={id:string;name:string;author_name:string;kind:'c'|'cpp'|'mcp';mcp_status:'online'|'offline'|'unchecked'|null;rating:number;matches:number};
 async function loadLadder(){
  const board=document.querySelector<HTMLElement>('.leaderboard');if(!board)return;
+ board.querySelectorAll('.ladder-row,.ladder-empty').forEach(row=>row.remove());
  const status=document.createElement('p');status.className='ladder-empty';status.textContent='正在读取排行榜…';board.append(status);
  try{
   const response=await fetch(api,{headers:{apikey:publishableKey,Authorization:'Bearer '+publishableKey}});
@@ -21,4 +22,5 @@ async function loadLadder(){
  }catch{status.textContent='排行榜暂时不可用，请稍后重试。';}
 }
 void loadLadder();
+window.addEventListener('qiling-ladder-refresh',()=>{void loadLadder();});
 

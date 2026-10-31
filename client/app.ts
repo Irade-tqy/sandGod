@@ -1,10 +1,11 @@
-declare function io(): any;
+declare function io(uri?:string,options?:{autoConnect?:boolean}): any;
 type Wall={id:number;orientation:number;row:number;col:number;length:number;owned?:boolean;opponentOwned?:boolean};
 type Frame={positions:[number,number];player:number|null;action:number|null;boundary?:number;removedWalls?:number[]};
 type State={gameId:string;ready:boolean;chosen:boolean;position:number|null;walls:Wall[];legal:number[];turn:string;winner:number|null;inventory:number;opponentInventory:number;ownFirst?:boolean;unlimitedWalls?:boolean;ownWallCount?:number;opponentWallCount?:number;boundary?:number;rounds?:number;manualAvailable?:boolean;pendingManual?:boolean;canPass?:boolean;history:{player:number;text:string}[];opponentPosition:number|null;replay?:Frame[]};
 type Tab='solo'|'lan'|'training'|'rules'|'ladder';
 type SavedReplay={mode:Tab;state:State;savedAt:number};
-const socket=io(), el=(id:string)=>document.getElementById(id)!;
+const serverAddress=(window as Window & {SANDGOD_GAME_SERVER?:string}).SANDGOD_GAME_SERVER||'';
+const socket=io(serverAddress,{autoConnect:!!serverAddress}), el=(id:string)=>document.getElementById(id)!;
 let tab:Tab='solo',mode='move',solo:State|null=null,lan:State|null=null,review:State|null=null,replayIndex:number|null=null,roomConnected=false,roomActive=false,hover:number|null=null,manualArmed=false;
 let setupOpen=true,gameHasHuman=true,lanWeightConfigured=false,lanBothWeights=false;
 const walls:Wall[]=[];
@@ -30,7 +31,8 @@ const probabilities=[probabilityControl(el('probability-0')),probabilityControl(
 function selectedType(p:number){return document.querySelector<HTMLInputElement>(`input[name="type-${p}"]:checked`)!.value;}
 for(const p of [0,1]){const update=()=>{const type=selectedType(p);for(const t of ['human','ladder'])el(`${t}-options-${p}`).hidden=type!==t;};document.querySelectorAll<HTMLInputElement>(`input[name="type-${p}"]`).forEach(e=>e.onchange=update);update();}
 window.addEventListener('qiling-ladder',event=>{const entries=(event as CustomEvent<{id:string;name:string;kind:string;mcp_status:string}[]>).detail;for(const p of [0,1]){const select=el(`ladder-player-${p}`) as HTMLSelectElement,previous=select.value;select.replaceChildren(new Option('选择天梯选手',''));for(const entry of entries.filter(e=>e.kind==='mcp'))select.add(new Option(entry.name+(entry.mcp_status==='offline'?' · MCP 离线':''),entry.id));if(previous)select.value=previous;}});
-el('game-start').onclick=()=>{const types=[selectedType(0),selectedType(1)];if(types.filter(type=>type==='human').length!==1){el('setup-error').textContent='请选择一名人类和一名天梯选手。';el('setup-error').hidden=false;return;}const human=types.indexOf('human'),bot=1-human,entryId=(el(`ladder-player-${bot}`) as HTMLSelectElement).value;if(!entryId){el('setup-error').textContent='请选择天梯选手。';el('setup-error').hidden=false;return;}const button=el('game-start') as HTMLButtonElement;button.disabled=true;el('setup-error').hidden=true;command('ladder-new',{human,weights:probabilities[human](),entryId}).then(()=>{gameHasHuman=true;setupOpen=false;switchTab('solo');}).catch(error=>{el('setup-error').textContent=error.message;el('setup-error').hidden=false;}).finally(()=>button.disabled=false);};
+el('game-start').onclick=()=>{const types=[selectedType(0),selectedType(1)];if(types.filter(type=>type==='human').length!==1){el('setup-error').textContent='请选择一名人类和一名天梯选手。';el('setup-error').hidden=false;return;}const human=types.indexOf('human'),bot=1-human,entryId=(el(`ladder-player-${bot}`) as HTMLSelectElement).value;if(!entryId){el('setup-error').textContent='请选择天梯选手。';el('setup-error').hidden=false;return;}const button=el('game-start') as HTMLButtonElement;button.disabled=true;el('setup-error').hidden=true;command('ladder-new',{human,weights:probabilities[human](),entryId}).then(()=>{window.dispatchEvent(new Event('qiling-ladder-refresh'));gameHasHuman=true;setupOpen=false;switchTab('solo');}).catch(error=>{window.dispatchEvent(new Event('qiling-ladder-refresh'));el('setup-error').textContent=error.message;el('setup-error').hidden=false;}).finally(()=>button.disabled=false);};
+if(!serverAddress){(el('game-start') as HTMLButtonElement).disabled=true;el('setup-error').textContent='对局服务尚未开放。';el('setup-error').hidden=false;}
 el('game-settings').onclick=()=>{void command('ladder-close').catch(fail);setupOpen=true;solo=null;switchTab('solo');};
 el('lan-weights-confirm').onclick=()=>command('lan-weights',{weights:lanProbabilities()}).catch(error=>{el('lan-weights-status').textContent=error.message;});
 el('lan-weights-leave').onclick=()=>command('leave').catch(error=>{el('lan-weights-status').textContent=error.message;});
@@ -87,7 +89,7 @@ async function refreshEvaluation(){try{
  make('line',{x1:45,y1:190,x2:755,y2:190,class:'eval-axis'});for(let i=0;i<points.length;i++){const [x,y]=xy(points[i],i);if(i&&points[i-1].generation===points[i].generation){const [px,py]=xy(points[i-1],i-1);make('line',{x1:px,y1:py,x2:x,y2:y,class:'eval-line'});}const dot=make('circle',{cx:x,cy:y,r:4,class:'eval-dot'});const title=document.createElementNS(ns,'title');title.textContent=`第 ${points[i].update} 轮：${points[i].rating} Elo，${points[i].decisive} 局已结束`;dot.append(title);}
  for(const [y,value] of [[30,max],[190,min]]){const label=make('text',{x:2,y:y+4,class:'eval-label'});label.textContent=String(Math.round(value));}
  }catch{el('eval-progress').textContent='评估状态不可用';}}
-setInterval(()=>{if(tab==='training'){refreshTraining();refreshEvaluation();}},10000);setInterval(refreshEvaluation,30000);refreshEvaluation();
+
 for(const b of document.querySelectorAll<HTMLButtonElement>('[data-mode]'))b.onclick=()=>{mode=b.dataset.mode!;hover=null;render();};
 (el('difficulty') as HTMLInputElement).oninput=e=>{const value=(e.target as HTMLInputElement).value;el('difficulty-value').textContent=value+'%';localStorage.setItem('qiling-difficulty',value);};
 const savedDifficulty=localStorage.getItem('qiling-difficulty');if(savedDifficulty){(el('difficulty') as HTMLInputElement).value=savedDifficulty;el('difficulty-value').textContent=savedDifficulty+'%';}

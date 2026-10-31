@@ -17,5 +17,10 @@ void (async()=>{
     assert.deepEqual(await store.getActiveMcp(id),{id,endpoint:'https://example.com/mcp'});
     await store.setMcpStatus(id,'offline');
     assert.equal(calls,2);
+    await assert.rejects(store.recordMatch(id,id,id,id));
+    assert.equal(calls,2);
+    const other='00000000-0000-0000-0000-000000000002';
+    await store.recordMatch(id,id,other,id);
+    assert.equal(calls,3);
   }finally{globalThis.fetch=original;}
 })().catch(error=>{console.error(error);process.exitCode=1;});
