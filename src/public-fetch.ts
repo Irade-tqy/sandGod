@@ -1,4 +1,4 @@
-import {lookup} from 'node:dns';
+import {lookup,LookupAddress} from 'node:dns';
 import {LookupFunction} from 'node:net';
 import {Agent,fetch as undiciFetch} from 'undici';
 import {isPublicAddress,publicEndpoint} from './public-address';
@@ -14,16 +14,21 @@ export function limitResponse(response:Response):Response {
   return new Response(limited,{status:response.status,statusText:response.statusText,headers:response.headers});
 }
 
-export function createPublicFetch(endpoint:string) {
-  const url=publicEndpoint(endpoint);
-  const safeLookup:LookupFunction=(hostname,options,callback)=>{
-    lookup(hostname,{all:true,verbatim:true},(error,addresses)=>{
+type ResolveAll=(hostname:string,callback:(error:NodeJS.ErrnoException|null,addresses:LookupAddress[])=>void)=>void;
+export function createSafeLookup(resolve:ResolveAll=(hostname,callback)=>lookup(hostname,{all:true,verbatim:true},callback)):LookupFunction {
+  return (hostname,options,callback)=>{
+    resolve(hostname,(error,addresses)=>{
       if (error) return callback(error,'',0);
       if (!addresses.length || addresses.some(item=>!isPublicAddress(item.address))) return callback(new Error('MCP 地址解析到了非公网地址'),'',0);
       if (options.all) return callback(null,addresses);
       return callback(null,addresses[0].address,addresses[0].family);
     });
   };
+}
+
+export function createPublicFetch(endpoint:string) {
+  const url=publicEndpoint(endpoint);
+  const safeLookup=createSafeLookup();
   const agent=new Agent({connect:{lookup:safeLookup},autoSelectFamily:false});
   const fetcher:typeof globalThis.fetch=async(input,init)=>{
     if (input instanceof Request) throw Error('不支持 Request 对象');

@@ -6,3 +6,5 @@ dist/
 *.onnx
 *.wasm
 uploads/
+public/app.js
+public/ladder.js
