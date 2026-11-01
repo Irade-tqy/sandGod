@@ -16,9 +16,10 @@ function modelOpponent(player:Player):ModelOpponent{
   return new LocalOpponent('latest',player);
 }
 
-function visibleGame(game:SoloGame,player:Player):SoloGame{
+export function visibleGame(game:SoloGame,player:Player):SoloGame{
   return new Proxy(game,{
     get(target,key,receiver){
+      if(key==='ready')return target.ready;
       if(key==='positions'||key==='starts')return (Reflect.get(target,key,receiver) as (number|null)[]).map((value,seat)=>seat===player?value:null);
       if(key==='trace')return [];
       if(key==='walls')return new Set(target.walls);

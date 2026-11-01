@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {chooseLadderPlayer,playLadderMatch,LadderPlayer} from '../src/ladder-match';
+import {visibleGame} from '../src/reference-opponent';
 import {SoloGame} from '../src/solo-game';
 
 const valid:LadderPlayer={async choose(phase,_state,legal){
@@ -13,6 +14,12 @@ const invalid:LadderPlayer={async choose(phase,state,legal){
 }};
 void (async()=>{
   const game=new SoloGame();let internalGame:SoloGame|null=null;
+  game.choose(0,4);game.choose(1,3);
+  const view=visibleGame(game,0);
+  assert.equal(view.ready,true);
+  assert.deepEqual(view.positions,[72+4,null]);
+  assert.deepEqual(view.starts,[72+4,null]);
+  assert.ok(view.legal(0).length>0);
   await chooseLadderPlayer({...valid,async chooseWithGame(_phase,state){internalGame=state;return {weights:[25,25,25,25]};}},'weights',game,0,[]);
   assert.equal(internalGame,game);
   await assert.rejects(playLadderMatch([invalid,valid]),/无效行动/);
