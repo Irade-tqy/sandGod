@@ -37,7 +37,7 @@ export class LadderGame {
   private pump(){
     if(this.running||!this.active)return;
     this.running=true;
-    void this.play().catch(error=>{if(this.active)this.onError(error instanceof Error?error:Error('天梯选手不可用'));}).finally(()=>{this.running=false;});
+    setImmediate(()=>{void this.play().catch(error=>{if(this.active)this.onError(error instanceof Error?error:Error('天梯选手不可用'));}).finally(()=>{this.running=false;});});
   }
   private async play(){
     while(this.active&&this.game.ready&&this.game.winner===null&&this.game.turn===this.bot){
