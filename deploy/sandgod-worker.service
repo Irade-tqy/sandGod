@@ -5,7 +5,7 @@ After=network-online.target
 [Service]
 WorkingDirectory=/home/irade/github/sandGod
 EnvironmentFile=-/home/irade/.config/agent-control/keys.env
-Environment=SANDGOD_ENABLE_SOURCE_EVAL=0
+Environment=SANDGOD_ENABLE_SOURCE_EVAL=1
 Environment=SANDGOD_ARTIFACT_DIR=/home/irade/.local/share/sandgod/strategies
 ExecStart=/usr/bin/node /home/irade/github/sandGod/deploy/service.cjs worker
 Restart=on-failure

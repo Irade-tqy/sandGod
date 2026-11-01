@@ -41,9 +41,10 @@ function drawWall(w:Wall,css:string){const x=w.col*100,y=w.row*100;if(w.orientat
 function drawWalls(list:Wall[],debris:{q:number;k:number}[]){
  const dead=new Set(debris.map(e=>`${e.q}:${e.k}`));
  for(const {q,k} of debris){const x=q%9*100,y=Math.floor(q/9)*100;if(k===2)node('line',{x1:x,y1:y+100,x2:x+100,y2:y+100,class:'wall-debris'});else node('line',{x1:x+100,y1:y,x2:x+100,y2:y+100,class:'wall-debris'});}
- const edges=new Map<string,{orientation:number;row:number;col:number;own:boolean;opponent:boolean}>();
- for(const w of list){let hasDebris=false;for(let j=0;j<3;j++){const row=w.row+(w.orientation?j:0),col=w.col+(w.orientation?0:j),q=row*9+col,k=w.orientation?1:2;if(dead.has(`${q}:${k}`)){hasDebris=true;continue;}const key=`${w.orientation}:${row}:${col}`;const edge=edges.get(key)||{orientation:w.orientation,row,col,own:false,opponent:false};edge.own||=!!w.owned;edge.opponent||=!!w.opponentOwned;if(!w.owned&&!w.opponentOwned)edge.opponent=true;edges.set(key,edge);}if(hasDebris){const x=w.col*100+(w.orientation?100:0),y=w.row*100+(w.orientation?0:100);for(const n of [0,3])node('circle',{cx:x+(w.orientation?0:n*100),cy:y+(w.orientation?n*100:0),r:7,class:'debris-end'});}}
+ const edges=new Map<string,{orientation:number;row:number;col:number;own:boolean;opponent:boolean}>(),marked:Wall[]=[];
+ for(const w of list){let hasDebris=false;for(let j=0;j<3;j++){const row=w.row+(w.orientation?j:0),col=w.col+(w.orientation?0:j),q=row*9+col,k=w.orientation?1:2;if(dead.has(`${q}:${k}`)){hasDebris=true;continue;}const key=`${w.orientation}:${row}:${col}`;const edge=edges.get(key)||{orientation:w.orientation,row,col,own:false,opponent:false};edge.own||=!!w.owned;edge.opponent||=!!w.opponentOwned;if(!w.owned&&!w.opponentOwned)edge.opponent=true;edges.set(key,edge);}if(hasDebris)marked.push(w);}
  for(const edge of edges.values())for(const side of ['own','opponent'] as const){if(!edge[side])continue;const both=edge.own&&edge.opponent,offset=both?(side==='own'?-5:5):0,x=edge.col*100,y=edge.row*100,klass=`wall ${side}-wall${both?' shared-wall':''}`;if(edge.orientation===0)node('line',{x1:x,y1:y+100+offset,x2:x+100,y2:y+100+offset,class:klass});else node('line',{x1:x+100+offset,y1:y,x2:x+100+offset,y2:y+100,class:klass});}
+ for(const w of marked){const x=w.col*100+(w.orientation?100:0),y=w.row*100+(w.orientation?0:100),klass=`wall ${w.owned?'own':'opponent'}-wall`;for(const n of [0,280])node('line',{x1:x+(w.orientation?0:n),y1:y+(w.orientation?n:0),x2:x+(w.orientation?0:n+20),y2:y+(w.orientation?n+20:0),class:klass});}
 }
 
 function render(){

@@ -30,4 +30,4 @@
 
 #game-settings{display:block;margin:0 0 12px auto}.sandbox-board .wall-preview:not(.valid):not(.removal-preview){stroke:#b32f53}.history-column[data-order="first"] .history-list li::before{background:var(--petrol)}.history-column[data-order="second"] .history-list li::before{background:var(--terracotta)}
 
-.sandbox-board .wall-debris{stroke:#c9ccc8;stroke-width:9;stroke-linecap:round;pointer-events:none}.sandbox-board .debris-end{fill:#537b5b;pointer-events:none}
+.sandbox-board .wall-debris{stroke:#c9ccc8;stroke-width:9;stroke-linecap:round;pointer-events:none}
