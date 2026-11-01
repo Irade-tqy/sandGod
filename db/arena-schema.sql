@@ -5,7 +5,7 @@ create table public.arena_players (
  id uuid primary key default gen_random_uuid(),
  name text not null check (char_length(name) between 1 and 60),
  author_name text not null check (char_length(author_name) between 1 and 60),
- kind text not null check (kind in ('c','cpp','mcp')),
+ kind text not null check (kind in ('c','cpp','mcp','reference')),
  status text not null default 'pending' check (status in ('pending','active','disabled')),
  mcp_status text check (mcp_status in ('online','offline','unchecked')),
  rating double precision not null default 1500 check (rating >= 0 and rating <= 10000),

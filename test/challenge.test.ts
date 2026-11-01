@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import {challengeLadder} from '../src/challenge';
 import {LadderPlayer} from '../src/ladder-match';
 import {EvaluationInfrastructureError} from '../src/evaluation-errors';
+import {PlayerSource} from '../src/ladder-store';
 
 void (async()=>{
   const statuses:string[]=[];
-  const store={async getActiveMcp(id:string){return {id,endpoint:'https://example.com/mcp'};},async setMcpStatus(_id:string,status:'online'|'offline'){statuses.push(status);}};
+  let source:PlayerSource={kind:'mcp',endpoint:'https://example.com/mcp'};
+  const store={async getActivePlayer(){return source;},async setMcpStatus(_id:string,status:'online'|'offline'){statuses.push(status);}};
   const player:LadderPlayer={async choose(phase,_state,legal){return phase==='weights'?{weights:[25,25,25,25]}:phase==='start'?{col:4}:{action:legal[0]};}};
   const online=()=>({...player,async connect(){},async close(){}});
   const offline=()=>({...player,async connect(){throw Error('unreachable');},async close(){}});
@@ -19,4 +21,10 @@ void (async()=>{
   const session=await challengeLadder('entry',0,[25,25,25,25],store,online,()=>{},()=>{});
   assert.deepEqual(statuses,['offline','online']);
   await session.close();
+  source={kind:'reference'};
+  const reference=await challengeLadder('reference',0,[25,25,25,25],store,online,()=>{},()=>{});
+  assert.deepEqual(statuses,['offline','online']);
+  await reference.close();
+  await assert.rejects(challengeLadder('reference',0,[25,25,25,25],store,offline,()=>{},()=>{}),/参考策略/);
+  assert.deepEqual(statuses,['offline','online']);
 })().catch(error=>{console.error(error);process.exitCode=1;});

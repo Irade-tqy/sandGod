@@ -1,5 +1,6 @@
 const ORIGIN='https://icmudmlyhkxmiyeqwuvi.supabase.co';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export type PlayerSource={kind:'mcp';endpoint:string}|{kind:'wasm';id:string;sha256:string}|{kind:'reference'};
 
 export class LadderStore {
   constructor(private readonly secret:string){if(!secret)throw Error('天梯服务未配置数据库密钥');}
@@ -8,7 +9,9 @@ export class LadderStore {
     const response=await fetch(ORIGIN+path,{...options,redirect:'error',signal:options.signal?AbortSignal.any([options.signal,timeout]):timeout,headers:{apikey:this.secret,'Content-Type':'application/json',Prefer:'return=representation'}});
     if(!response.ok){
       const error=await response.json().catch(()=>null) as {message?:unknown}|null;
-      const messages:Record<string,string>={'queue full':'评测队列已满，请稍后再试','storage full':'源码暂存空间已满，请稍后再试','daily quota exceeded':'今天的提交次数已用完','submission already pending':'请等待上一次提交完成'};
+      const messages:Record<string,string>={'queue full':'评测队列已满，请稍后再试','storage full':'源码暂存空间已满，请稍后再试'};
+      const rateLimit=typeof error?.message==='string'?/^submission rate limit:(\d+)$/.exec(error.message):null;
+      if(rateLimit){const seconds=Number(rateLimit[1]);if(Number.isInteger(seconds)&&seconds>=1&&seconds<=300)throw Error(`submission rate limit:${seconds}`);}
       throw Error(typeof error?.message==='string'&&messages[error.message]?messages[error.message]:'天梯数据库暂时不可用');
     }
     if(response.status===204)return null;
@@ -120,12 +123,13 @@ export class LadderStore {
     if(!UUID.test(id)||!UUID.test(token)||typeof accepted!=='boolean'||(accepted&&(artifactSha256===null||!/^[0-9a-f]{64}$/.test(artifactSha256)))||(error!==null&&(typeof error!=='string'||error.length>240)))throw Error('评测结果无效');
     return await this.request('/rest/v1/rpc/arena_finish_source',{method:'POST',body:JSON.stringify({p_submission:id,p_token:token,p_accepted:accepted,p_artifact_sha256:artifactSha256,p_error:error})})===true;
   }
-  async getActivePlayer(id:string){
+  async getActivePlayer(id:string):Promise<PlayerSource|null>{
     if(!UUID.test(id))return null;
     const rows=await this.request('/rest/v1/arena_worker_players?select=id,kind,endpoint,artifact_id,artifact_sha256&id=eq.'+id+'&order=created_at.desc&limit=1');
     if(!Array.isArray(rows)||!rows.length)return null;
     const row=rows[0] as {id?:unknown;kind?:unknown;endpoint?:unknown;artifact_id?:unknown;artifact_sha256?:unknown};
     if(rows.length!==1||row.id!==id)throw Error('天梯选手无效');
+    if(row.kind==='reference')return {kind:'reference'};
     if(row.kind==='mcp'&&typeof row.endpoint==='string')return {kind:'mcp' as const,endpoint:row.endpoint};
     if((row.kind==='c'||row.kind==='cpp')&&typeof row.artifact_id==='string'&&UUID.test(row.artifact_id)&&typeof row.artifact_sha256==='string'&&/^[0-9a-f]{64}$/.test(row.artifact_sha256))return {kind:'wasm' as const,id:row.artifact_id,sha256:row.artifact_sha256};
     throw Error('天梯选手无效');

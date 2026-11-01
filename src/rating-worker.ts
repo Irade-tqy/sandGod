@@ -1,9 +1,9 @@
 import {randomUUID} from 'node:crypto';
 import {LadderPlayer,playLadderMatch} from './ladder-match';
 import {EvaluationInfrastructureError} from './evaluation-errors';
+import type {PlayerSource} from './ladder-store';
 
 type ConnectedPlayer=LadderPlayer & {connect():Promise<void>;close():Promise<void>};
-export type PlayerSource={kind:'mcp';endpoint:string}|{kind:'wasm';id:string;sha256:string};
 type Store={claimRating(token:string):Promise<{jobId:string;first:string;second:string}|null>;getActivePlayer(id:string):Promise<PlayerSource|null>;finishRating(id:string,token:string,winner:string|null,completed:boolean):Promise<boolean>};
 
 export async function processOneRating(store:Store,connect:(source:PlayerSource)=>Promise<ConnectedPlayer>,play=playLadderMatch):Promise<boolean>{

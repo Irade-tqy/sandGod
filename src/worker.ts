@@ -12,6 +12,8 @@ import {processOneSource} from './source-worker';
 import {validateCandidate} from './evaluate-ladder';
 import {referencePlayer} from './reference-player';
 import {EvaluationInfrastructureError} from './evaluation-errors';
+import {ReferenceOpponent} from './reference-opponent';
+import type {PlayerSource} from './ladder-store';
 
 const secret=process.env.SANDGOD_SUPABASE_SECRET_KEY;
 if(!secret)throw Error('天梯评测服务未配置数据库密钥');
@@ -29,8 +31,9 @@ void (async()=>{
   while(running){
     try{
       const make=(endpoint:string)=>new McpOpponent(endpoint);
-      const makeRated=async(source:{kind:'mcp';endpoint:string}|{kind:'wasm';id:string;sha256:string})=>{
+      const makeRated=async(source:PlayerSource)=>{
         if(source.kind==='mcp')return make(source.endpoint);
+        if(source.kind==='reference')return new ReferenceOpponent();
         if(!sourceEnabled||!artifacts)throw new EvaluationInfrastructureError('源码评测暂未开放');
         let wasm:Buffer;try{wasm=await artifacts.read(source.id,source.sha256);}catch{throw new EvaluationInfrastructureError('本地选手文件不可用');}
         const opponent=new WasmOpponent(wasm);

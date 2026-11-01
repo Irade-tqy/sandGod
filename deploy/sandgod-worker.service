@@ -7,6 +7,7 @@ WorkingDirectory=/home/irade/github/sandGod
 EnvironmentFile=-/home/irade/.config/agent-control/keys.env
 Environment=SANDGOD_ENABLE_SOURCE_EVAL=1
 Environment=SANDGOD_ARTIFACT_DIR=/home/irade/.local/share/sandgod/strategies
+Environment=SANDGOD_LOCAL_MODEL_APP=/home/irade/sandGod/typescript-app
 ExecStart=/usr/bin/node /home/irade/github/sandGod/deploy/service.cjs worker
 Restart=on-failure
 RestartSec=5

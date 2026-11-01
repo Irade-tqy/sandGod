@@ -4,6 +4,8 @@ import {Server} from 'socket.io';
 import {challengeLadder} from './challenge';
 import {LadderStore} from './ladder-store';
 import {McpOpponent} from './mcp-opponent';
+import {ReferenceOpponent} from './reference-opponent';
+import type {PlayerSource} from './ladder-store';
 import {Player} from './game';
 import {submissionApi} from './submission-api';
 import {verifiedUser} from './user-auth';
@@ -22,7 +24,7 @@ function gameOrigin(origin:string|undefined){
   if(allowedSubmissionOrigins.includes(origin))return true;
   try{const url=new URL(origin);return url.origin===origin&&url.protocol==='http:'&&url.port==='3000'&&ipaddr.isValid(url.hostname)&&['private','loopback','linkLocal','uniqueLocal'].includes(ipaddr.process(url.hostname).range());}catch{return false;}
 }
-const clientErrors=new Set(['请先结束当前对局','对局设置无效','请等待对局准备完成','请选择起始位置','行动无效','未知操作','天梯选手不可用','MCP 选手离线或不可用','天梯网络暂时不可用','天梯数据库暂时不可用','玩家位置无效','四个方向概率必须是至少 1% 的整数，总和为 100%。','请选择起始行上的位置。','这个行动不可用','对局已关闭','天梯繁忙，请稍后再试']);
+const clientErrors=new Set(['请先结束当前对局','对局设置无效','请等待对局准备完成','请选择起始位置','行动无效','未知操作','天梯选手不可用','MCP 选手离线或不可用','参考策略暂时不可用','天梯网络暂时不可用','天梯数据库暂时不可用','玩家位置无效','四个方向概率必须是至少 1% 的整数，总和为 100%。','请选择起始行上的位置。','这个行动不可用','对局已关闭','天梯繁忙，请稍后再试']);
 const app=express(), server=createServer(app), store=new LadderStore(secret);
 // Tailscale's HTTP proxy replaces X-Forwarded-For; this server listens only on loopback.
 app.set('trust proxy',1);
@@ -63,7 +65,11 @@ io.on('connection',socket=>{
         const release=reserveStart(socket.data.clientKey as string);if(!release)throw Error('天梯繁忙，请稍后再试');
         busy=true;
         try{
-          const created=await challengeLadder(input.entryId,input.human as Player,input.weights,store,endpoint=>new McpOpponent(endpoint),state=>socket.emit('state',{mode:'solo',state}),()=>socket.emit('game-error','天梯选手暂时不可用。'));
+          const created=await challengeLadder(input.entryId,input.human as Player,input.weights,store,source=>{
+            if(source.kind==='reference')return new ReferenceOpponent();
+            if(source.kind==='mcp')return new McpOpponent(source.endpoint);
+            throw Error('天梯选手不可用');
+          },state=>socket.emit('state',{mode:'solo',state}),()=>socket.emit('game-error','天梯选手暂时不可用。'));
           if(!socket.connected){await created.close();return;}
           session=created;
         }finally{busy=false;release();}
