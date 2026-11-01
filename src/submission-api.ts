@@ -60,7 +60,7 @@ export function submissionApi(store:Store,verify:Verify,origin:string|string[],s
       await source.upload(task.path,req.body);
       if(!await source.publishSource(task.id,owner))throw Error('提交已失效');
       return res.status(202).json({id:task.id});
-    }catch{try{await source.cancelSource(task.id,owner);}catch{}return res.status(503).json({error:'上传暂时不可用'});}
+    }catch{return res.status(503).json({error:'上传状态暂不确定，请稍后检查'});}
   });
   router.delete('/submissions/source/:id',async(req,res)=>{
     if(!source)return res.status(503).json({error:'源码提交尚未开放'});

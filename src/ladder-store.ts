@@ -4,7 +4,8 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export class LadderStore {
   constructor(private readonly secret:string){if(!secret)throw Error('天梯服务未配置数据库密钥');}
   private async request(path:string,options:RequestInit={}){
-    const response=await fetch(ORIGIN+path,{...options,redirect:'error',headers:{apikey:this.secret,'Content-Type':'application/json',Prefer:'return=representation'}});
+    const timeout=AbortSignal.timeout(10000);
+    const response=await fetch(ORIGIN+path,{...options,redirect:'error',signal:options.signal?AbortSignal.any([options.signal,timeout]):timeout,headers:{apikey:this.secret,'Content-Type':'application/json',Prefer:'return=representation'}});
     if(!response.ok){
       const error=await response.json().catch(()=>null) as {message?:unknown}|null;
       const messages:Record<string,string>={'queue full':'评测队列已满，请稍后再试','storage full':'源码暂存空间已满，请稍后再试','daily quota exceeded':'今天的提交次数已用完','submission already pending':'请等待上一次提交完成'};

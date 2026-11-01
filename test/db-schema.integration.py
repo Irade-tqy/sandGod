@@ -10,7 +10,7 @@ files = [
     'arena-mcp-queue.sql', 'arena-submission-status.sql', 'arena-rating-jobs.sql',
     'arena-source-reserve.sql', 'arena-mcp-staging-limits.sql', 'arena-source-jobs.sql',
     'arena-source-staging.sql', 'arena-source-errors.sql', 'arena-mcp-retry.sql', 'arena-upload-grace.sql',
-    'arena-cleanup-recheck.sql', 'arena-backpressure.sql',
+    'arena-cleanup-recheck.sql', 'arena-backpressure.sql', 'arena-upload-preservation.sql',
 ]
 
 def sql(text):
@@ -58,6 +58,21 @@ try:
         EXCEPTION WHEN OTHERS THEN
           IF SQLERRM <> 'queue full' THEN RAISE; END IF;
         END;
+      END $$;
+      ROLLBACK;
+      BEGIN;
+      INSERT INTO auth.users(id) VALUES ('00000000-0000-0000-0000-000000000001');
+      INSERT INTO public.arena_players(id,name,author_name,kind,status) VALUES
+        ('00000000-0000-0000-0000-000000000002','a','test','c','pending');
+      INSERT INTO arena_private.submissions(id,owner_id,player_id,source_path,state,created_at) VALUES
+        ('00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','pending/test.c','staging',now()-interval '26 minutes');
+      INSERT INTO storage.objects(bucket_id,name) VALUES ('arena-submissions','pending/test.c');
+      SET LOCAL ROLE service_role;
+      SELECT * FROM public.arena_claim_cleanup('00000000-0000-0000-0000-000000000004');
+      DO $$ BEGIN
+        IF NOT EXISTS(SELECT 1 FROM arena_private.submissions WHERE id='00000000-0000-0000-0000-000000000003' AND state='error' AND source_deleted_at IS NULL) THEN
+          RAISE EXCEPTION 'uploaded source was not preserved';
+        END IF;
       END $$;
       ROLLBACK;
       DO $$ BEGIN

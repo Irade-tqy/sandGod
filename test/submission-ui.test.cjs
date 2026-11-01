@@ -1,11 +1,13 @@
 const assert = require('node:assert/strict');
 const {readFileSync} = require('node:fs');
 const vm = require('node:vm');
+const {webcrypto} = require('node:crypto');
 
-async function check(origin, backend, returning = false) {
-  const ids = ['ladder-login','ladder-logout','submit-form','submit-status','submit-button','submit-source-choice','submit-endpoint','submit-file','submit-source-field','submit-mcp-field'];
+async function check(origin, backend, returning = false, network = undefined) {
+  const ids = ['ladder-login','ladder-logout','submit-form','submit-status','submit-button','submit-source-choice','submit-endpoint','submit-file','submit-source-field','submit-mcp-field','submit-name','submit-author'];
   const elements = Object.fromEntries(ids.map(id => [id, {}]));
-  elements['submit-form'].elements = {namedItem: () => ({value: 'mcp'})};
+  const kind = {value: 'mcp'};
+  elements['submit-form'].elements = {namedItem: () => kind};
   elements['submit-form'].querySelectorAll = () => [];
   const items = new Map(returning ? [['qiling-login-return','ladder']] : []);
   const storage = {getItem: key => items.get(key) || null, setItem: (key, value) => items.set(key, value), removeItem: key => items.delete(key)};
@@ -16,13 +18,13 @@ async function check(origin, backend, returning = false) {
     signInWithOAuth: async options => { loginOptions = options; return {error: null}; },
     signOut: async () => { callback('SIGNED_OUT', null); return {error: null}; }
   };
-  const window = {SANDGOD_GAME_SERVER: backend, supabase: {createClient: () => ({auth})}};
+  const window = {SANDGOD_GAME_SERVER: backend, SANDGOD_SOURCE_UPLOAD: true, supabase: {createClient: () => ({auth})}};
   const location = new URL(origin);
   const document = {getElementById: id => elements[id], querySelector: () => ({click: () => { tabOpened = true; }})};
   const source = readFileSync('public/submission.js', 'utf8').replace(/^import .*\n/, "const publishableKey = 'test';\n");
-  vm.runInNewContext(source, {window, document, location, sessionStorage: storage, URL, setTimeout});
+  vm.runInNewContext(source, {window, document, location, sessionStorage: storage, URL, setTimeout, fetch: network, crypto: webcrypto, Uint8Array});
   await Promise.resolve();
-  return {elements, callback, storage, auth, getLoginOptions: () => loginOptions, tabOpened};
+  return {elements, callback, storage, auth, kind, getLoginOptions: () => loginOptions, tabOpened};
 }
 
 (async () => {
@@ -45,5 +47,17 @@ async function check(origin, backend, returning = false) {
   assert.equal(publicSite.elements['submit-form'].hidden, false);
   const other = await check('http://192.168.1.2:3000/', '');
   assert.equal(other.elements['ladder-login'].disabled, true);
+  const methods=[];
+  const upload=await check('https://irade-tqy.github.io/sandGod/','https://arena.example',false,async(_url,init)=>{
+    methods.push(init.method);
+    return init.method==='POST'?new Response(JSON.stringify({id:'test-id'}),{status:202}):new Response(JSON.stringify({error:'上传状态暂不确定，请稍后检查'}),{status:503});
+  });
+  upload.auth.getSession=async()=>({data:{session:{access_token:'test'}},error:null});
+  upload.kind.value='source';upload.elements['submit-name'].value='选手';upload.elements['submit-author'].value='作者';
+  upload.elements['submit-file'].files=[{name:'test.c',size:1,arrayBuffer:async()=>new Uint8Array([65]).buffer}];
+  upload.elements['submit-form'].onsubmit({preventDefault(){}});
+  for(let i=0;i<50&&upload.elements['submit-button'].disabled;i++)await new Promise(resolve=>setTimeout(resolve,10));
+  assert.deepEqual(methods,['POST','PUT']);
+  assert.equal(upload.elements['submit-status'].textContent,'上传状态暂不确定，请稍后检查');
   console.log('GitHub login UI checks passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

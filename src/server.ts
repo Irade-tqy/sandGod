@@ -11,6 +11,7 @@ import {SourceStorage} from './source-storage';
 import {isIP} from 'node:net';
 import {ipKeyGenerator} from 'express-rate-limit';
 import ipaddr from 'ipaddr.js';
+import {startLimiter} from './start-limit';
 
 const secret=process.env.SANDGOD_SUPABASE_SECRET_KEY;
 if(!secret)throw Error('天梯服务未配置数据库密钥');
@@ -21,7 +22,7 @@ function gameOrigin(origin:string|undefined){
   if(allowedSubmissionOrigins.includes(origin))return true;
   try{const url=new URL(origin);return url.origin===origin&&url.protocol==='http:'&&url.port==='3000'&&ipaddr.isValid(url.hostname)&&['private','loopback','linkLocal','uniqueLocal'].includes(ipaddr.process(url.hostname).range());}catch{return false;}
 }
-const clientErrors=new Set(['请先结束当前对局','对局设置无效','请等待对局准备完成','请选择起始位置','行动无效','未知操作','天梯选手不可用','MCP 选手离线或不可用','天梯网络暂时不可用','天梯数据库暂时不可用','玩家位置无效','四个方向概率必须是至少 1% 的整数，总和为 100%。','请选择起始行上的位置。','这个行动不可用','对局已关闭']);
+const clientErrors=new Set(['请先结束当前对局','对局设置无效','请等待对局准备完成','请选择起始位置','行动无效','未知操作','天梯选手不可用','MCP 选手离线或不可用','天梯网络暂时不可用','天梯数据库暂时不可用','玩家位置无效','四个方向概率必须是至少 1% 的整数，总和为 100%。','请选择起始行上的位置。','这个行动不可用','对局已关闭','天梯繁忙，请稍后再试']);
 const app=express(), server=createServer(app), store=new LadderStore(secret);
 // Tailscale's HTTP proxy replaces X-Forwarded-For; this server listens only on loopback.
 app.set('trust proxy',1);
@@ -35,11 +36,13 @@ app.get('/healthz',(_req,res)=>res.json({ok:true}));
 app.use('/api',submissionApi(store,authorization=>verifiedUser(authorization,secret),allowedSubmissionOrigins,source));
 const io=new Server(server,{maxHttpBufferSize:32768,cors:{origin:(origin,callback)=>callback(null,gameOrigin(origin))},allowRequest:(request,callback)=>callback(null,gameOrigin(request.headers.origin))});
 const connections=new Map<string,number>();
+const reserveStart=startLimiter();
 io.use((socket,next)=>{
   const forwarded=socket.request.headers['x-forwarded-for'];
   const ip=ipKeyGenerator(typeof forwarded==='string'&&isIP(forwarded)?forwarded:(socket.request.socket.remoteAddress??''));
   const total=[...connections.values()].reduce((a,b)=>a+b,0),perIp=connections.get(ip)??0;
   if(!ip||total>=50||perIp>=5)return next(Error('连接已满，请稍后重试'));
+  socket.data.clientKey=ip;
   connections.set(ip,perIp+1);
   socket.once('disconnect',()=>{const n=connections.get(ip)??0;if(n<=1)connections.delete(ip);else connections.set(ip,n-1);});
   next();
@@ -57,12 +60,13 @@ io.on('connection',socket=>{
       if(input.kind==='ladder-new'){
         if(busy||session)throw Error('请先结束当前对局');
         if((input.human!==0&&input.human!==1)||!Array.isArray(input.weights)||typeof input.entryId!=='string')throw Error('对局设置无效');
+        const release=reserveStart(socket.data.clientKey as string);if(!release)throw Error('天梯繁忙，请稍后再试');
         busy=true;
         try{
           const created=await challengeLadder(input.entryId,input.human as Player,input.weights,store,endpoint=>new McpOpponent(endpoint),state=>socket.emit('state',{mode:'solo',state}),()=>socket.emit('game-error','天梯选手暂时不可用。'));
           if(!socket.connected){await created.close();return;}
           session=created;
-        }finally{busy=false;}
+        }finally{busy=false;release();}
       }else if(input.kind==='ladder-close'){
         if(busy)throw Error('请等待对局准备完成');
         const previous=session;session=undefined;await previous?.close();

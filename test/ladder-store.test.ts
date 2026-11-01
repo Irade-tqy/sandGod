@@ -8,6 +8,7 @@ void (async()=>{
     calls++;
     assert.ok(String(input).startsWith('https://icmudmlyhkxmiyeqwuvi.supabase.co/rest/v1/'));
     assert.equal(init?.redirect,'error');
+    assert.ok(init?.signal instanceof AbortSignal);
     assert.equal(new Headers(init?.headers).has('authorization'),false);
     assert.equal(new Headers(init?.headers).get('apikey'),'test-only');
     const row=String(input).includes('arena_submission_status')?{id,state:'pending',endpoint:'private',owner_id:'private'}:{id,endpoint:'https://example.com/mcp'};
@@ -27,5 +28,11 @@ void (async()=>{
     assert.equal(calls,3);
     const status=await store.getSubmission(id,id);
     assert.ok(status && !('endpoint' in status) && !('owner_id' in status));
+    const timeout=AbortSignal.timeout;
+    try{
+      AbortSignal.timeout=()=>AbortSignal.abort();
+      globalThis.fetch=async(_input,init)=>{init?.signal?.throwIfAborted();throw Error('request should be aborted');};
+      await assert.rejects(store.getActiveMcp(id));
+    }finally{AbortSignal.timeout=timeout;}
   }finally{globalThis.fetch=original;}
 })().catch(error=>{console.error(error);process.exitCode=1;});

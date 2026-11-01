@@ -43,7 +43,7 @@ if(config.supabase){
   form.onsubmit=event=>{
     event.preventDefault();button.disabled=true;
     void (async()=>{
-      let reservation:string|null=null;const session=(await auth.getSession()).data.session;if(!session)throw Error('请先登录。');
+      let reservation:string|null=null,transferStarted=false;const session=(await auth.getSession()).data.session;if(!session)throw Error('请先登录。');
       const name=(document.getElementById('submit-name') as HTMLInputElement).value.trim(),author=(document.getElementById('submit-author') as HTMLInputElement).value.trim();
       const kind=(form.elements.namedItem('submit-kind') as RadioNodeList).value;
       try{
@@ -53,7 +53,7 @@ if(config.supabase){
           const bytes=await selected.arrayBuffer();const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(n=>n.toString(16).padStart(2,'0')).join('');
           result=await request('/api/submissions/source',session,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,author,filename:selected.name,sha256:digest,size:selected.size})});
           if(typeof result?.id!=='string')throw Error('提交暂时不可用。');reservation=result.id;
-          result=await request('/api/submissions/source/'+encodeURIComponent(reservation),session,{method:'PUT',headers:{'Content-Type':'application/octet-stream'},body:bytes});
+          transferStarted=true;result=await request('/api/submissions/source/'+encodeURIComponent(reservation),session,{method:'PUT',headers:{'Content-Type':'application/octet-stream'},body:bytes});
           reservation=null;
         }else{
           const url=new URL(endpoint.value);if(url.protocol!=='https:')throw Error('请填写公网 HTTPS 地址。');
@@ -63,7 +63,7 @@ if(config.supabase){
         if(typeof result?.id!=='string')throw Error('提交暂时不可用。');
         status.textContent='已提交，等待评测…';void poll(result.id);
       }catch(error){
-        if(reservation)void request('/api/submissions/source/'+encodeURIComponent(reservation),session,{method:'DELETE'}).catch(()=>{});
+        if(reservation&&!transferStarted)void request('/api/submissions/source/'+encodeURIComponent(reservation),session,{method:'DELETE'}).catch(()=>{});
         throw error;
       }
     })().catch(error=>{status.textContent=error instanceof Error?error.message:'提交暂时不可用。';}).finally(()=>{button.disabled=false;});

@@ -7,8 +7,8 @@ void (async()=>{
   const owner='00000000-0000-0000-0000-000000000001',id='00000000-0000-0000-0000-000000000002';
   let saved:string|undefined;
   const store={async enqueueMcp(user:string,_name:string,_author:string,url:string){assert.equal(user,owner);saved=url;return id;},async getSubmission(candidate:string,user:string){return candidate===id&&user===owner?{id,state:'pending'}:null;}};
-  const code=Buffer.from('int main(){}'),hash=createHash('sha256').update(code).digest('hex');let uploaded=false,published=false,cancelled=false;
-  const source={async reserveSource(user:string,_name:string,_author:string,kind:'c'|'cpp',sha:string,size:number){assert.equal(user,owner);assert.equal(kind,'c');assert.equal(sha,hash);assert.equal(size,code.length);return {id,path:'private'};},async sourceStaging(candidate:string,user:string){return candidate===id&&user===owner?{id,path:'private',sha256:hash,size:code.length,kind:'c' as const}:null;},async publishSource(){published=true;return true;},async cancelSource(){cancelled=true;return true;},async upload(path:string,data:Uint8Array){assert.equal(path,'private');assert.deepEqual(Buffer.from(data),code);uploaded=true;}};
+  const code=Buffer.from('int main(){}'),hash=createHash('sha256').update(code).digest('hex');let uploaded=false,published=false,cancelled=false,uploadFailure=false;
+  const source={async reserveSource(user:string,_name:string,_author:string,kind:'c'|'cpp',sha:string,size:number){assert.equal(user,owner);assert.equal(kind,'c');assert.equal(sha,hash);assert.equal(size,code.length);return {id,path:'private'};},async sourceStaging(candidate:string,user:string){return candidate===id&&user===owner?{id,path:'private',sha256:hash,size:code.length,kind:'c' as const}:null;},async publishSource(){published=true;return true;},async cancelSource(){cancelled=true;return true;},async upload(path:string,data:Uint8Array){assert.equal(path,'private');assert.deepEqual(Buffer.from(data),code);if(uploadFailure)throw Error('network failure');uploaded=true;}};
   const app=express();app.use('/api',submissionApi(store,async token=>token==='Bearer valid'?owner:null,'https://site.example',source));
   const server=app.listen(0,'127.0.0.1');
   await new Promise<void>(resolve=>server.once('listening',resolve));
@@ -30,5 +30,8 @@ void (async()=>{
     uploaded=false;
     const mismatch=await fetch(base+'/submissions/source/'+id,{method:'PUT',headers:{...headers,'Content-Type':'application/octet-stream'},body:Buffer.from('wrong')});
     assert.equal(mismatch.status,400);assert.ok(cancelled&&!uploaded);
+    cancelled=false;uploadFailure=true;
+    const uncertain=await fetch(base+'/submissions/source/'+id,{method:'PUT',headers:{...headers,'Content-Type':'application/octet-stream'},body:code});
+    assert.equal(uncertain.status,503);assert.equal(cancelled,false);
   }finally{await new Promise<void>(resolve=>server.close(()=>resolve()));}
 })().catch(error=>{console.error(error);process.exitCode=1;});
