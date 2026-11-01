@@ -4,6 +4,7 @@ import {MAX_SUBMISSION_BYTES,validateSourceSubmission} from '../src/ladder-submi
 const source=new TextEncoder().encode('int main() { return 0; }');
 assert.equal(validateSourceSubmission('player.c',source),'c');
 assert.equal(validateSourceSubmission('player.cpp',source),'cpp');
+assert.equal(validateSourceSubmission('我的选手.cpp',source),'cpp');
 assert.throws(()=>validateSourceSubmission('../player.c',source));
 assert.throws(()=>validateSourceSubmission('player.py',source));
 assert.throws(()=>validateSourceSubmission('player.c',new Uint8Array()));

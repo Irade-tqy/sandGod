@@ -15,5 +15,12 @@ void (async()=>{
     const denied=io('http://127.0.0.1:31997',{extraHeaders:{Origin:'https://malicious.example'},transports:['websocket'],reconnection:false,timeout:3000});
     await new Promise<void>((resolve,reject)=>{denied.once('connect',()=>reject(Error('不应允许其他来源')));denied.once('connect_error',()=>resolve());});
     denied.disconnect();
+    const clients=Array.from({length:5},()=>io('http://127.0.0.1:31997',{extraHeaders:{Origin:'https://irade-tqy.github.io','X-Forwarded-For':'203.0.113.10'},transports:['websocket'],reconnection:false,timeout:3000}));
+    await Promise.all(clients.map(socket=>new Promise<void>((resolve,reject)=>{socket.once('connect',()=>resolve());socket.once('connect_error',reject);})));
+    const excess=io('http://127.0.0.1:31997',{extraHeaders:{Origin:'https://irade-tqy.github.io','X-Forwarded-For':'203.0.113.10'},transports:['websocket'],reconnection:false,timeout:3000});
+    await new Promise<void>((resolve,reject)=>{excess.once('connect',()=>reject(Error('同一地址超过连接上限')));excess.once('connect_error',()=>resolve());});
+    const other=io('http://127.0.0.1:31997',{extraHeaders:{Origin:'https://irade-tqy.github.io','X-Forwarded-For':'203.0.113.11'},transports:['websocket'],reconnection:false,timeout:3000});
+    await new Promise<void>((resolve,reject)=>{other.once('connect',()=>resolve());other.once('connect_error',reject);});
+    clients.forEach(socket=>socket.disconnect());excess.disconnect();other.disconnect();
   }finally{server.kill('SIGTERM');}
 })().catch(error=>{console.error(error);process.exitCode=1;});

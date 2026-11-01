@@ -2,6 +2,7 @@ import {LookupAddress} from 'node:dns';
 import {LookupFunction} from 'node:net';
 import {Agent,fetch as undiciFetch} from 'undici';
 import {isPublicAddress,publicEndpoint} from './public-address';
+import {EvaluationInfrastructureError} from './evaluation-errors';
 
 export function limitResponse(response:Response):Response {
   if (!response.body) return response;
@@ -17,12 +18,15 @@ export function limitResponse(response:Response):Response {
 type ResolveAll=(hostname:string,callback:(error:NodeJS.ErrnoException|null,addresses:LookupAddress[])=>void)=>void;
 export async function resolvePublicDns(hostname:string,fetcher:typeof fetch=globalThis.fetch):Promise<LookupAddress[]> {
   const query=async(type:1|28)=>{
-    const url=new URL('https://1.1.1.1/dns-query');url.searchParams.set('name',hostname);url.searchParams.set('type',String(type));
-    const response=await fetcher(url,{headers:{accept:'application/dns-json'},redirect:'error',signal:AbortSignal.timeout(5000)});
-    if(!response.ok)throw Error('公网 DNS 不可用');
-    const data=await limitResponse(response).json() as {Status?:unknown;Answer?:unknown};
-    if(data.Status!==0 || (data.Answer!==undefined&&!Array.isArray(data.Answer)))throw Error('公网 DNS 查询失败');
-    return ((data.Answer??[]) as {type?:unknown;data?:unknown}[]).filter(item=>item.type===type&&typeof item.data==='string').map(item=>({address:item.data as string,family:type===1?4:6}));
+    try{
+      const url=new URL('https://1.1.1.1/dns-query');url.searchParams.set('name',hostname);url.searchParams.set('type',String(type));
+      const response=await fetcher(url,{headers:{accept:'application/dns-json'},redirect:'error',signal:AbortSignal.timeout(5000)});
+      if(!response.ok)throw Error('DNS unavailable');
+      const data=await limitResponse(response).json() as {Status?:unknown;Answer?:unknown};
+      if(data.Status===3)return [];
+      if(data.Status!==0 || (data.Answer!==undefined&&!Array.isArray(data.Answer)))throw Error('DNS response invalid');
+      return ((data.Answer??[]) as {type?:unknown;data?:unknown}[]).filter(item=>item.type===type&&typeof item.data==='string').map(item=>({address:item.data as string,family:type===1?4:6}));
+    }catch{throw new EvaluationInfrastructureError('公网 DNS 暂时不可用');}
   };
   return (await Promise.all([query(1),query(28)])).flat();
 }

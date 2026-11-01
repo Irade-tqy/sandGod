@@ -8,6 +8,8 @@ void (async()=>{
     calls++;
     assert.ok(String(input).startsWith('https://icmudmlyhkxmiyeqwuvi.supabase.co/rest/v1/'));
     assert.equal(init?.redirect,'error');
+    assert.equal(new Headers(init?.headers).has('authorization'),false);
+    assert.equal(new Headers(init?.headers).get('apikey'),'test-only');
     const row=String(input).includes('arena_submission_status')?{id,state:'pending',endpoint:'private',owner_id:'private'}:{id,endpoint:'https://example.com/mcp'};
     return new Response(JSON.stringify(init?.method==='PATCH'?[{id}]:[row]),{status:200});
   };

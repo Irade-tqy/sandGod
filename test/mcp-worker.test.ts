@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {processOneMcp} from '../src/mcp-worker';
 import {LadderPlayer} from '../src/ladder-match';
+import {EvaluationInfrastructureError} from '../src/evaluation-errors';
 
 void (async()=>{
   let finished:{accepted:boolean;error:string|null}|null=null,closed=0;
@@ -14,5 +15,8 @@ void (async()=>{
   assert.equal((finished as unknown as {accepted:boolean}).accepted,false);
   assert.ok(!(finished as unknown as {error:string}).error.includes('private data'));
   assert.equal(closed,2);
+  finished=null;
+  await assert.rejects(processOneMcp(store,connect,async()=>{throw new EvaluationInfrastructureError('dns down');}));
+  assert.equal(finished,null);
   assert.equal(await processOneMcp({...store,async claimMcp(){return null;}},connect,async()=>{}),false);
 })().catch(error=>{console.error(error);process.exitCode=1;});

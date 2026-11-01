@@ -1,13 +1,13 @@
 export {};
 const api='https://icmudmlyhkxmiyeqwuvi.supabase.co/rest/v1/arena_players?select=id,name,author_name,kind,mcp_status,rating,matches&status=eq.active&order=rating.desc';
-const publishableKey="sb_publishable_VSzDyfevnd1CAiD_8sb6dg_UgnUgree";
+import {publishableKey} from './auth-config.js';
 type Entry={id:string;name:string;author_name:string;kind:'c'|'cpp'|'mcp';mcp_status:'online'|'offline'|'unchecked'|null;rating:number;matches:number};
 async function loadLadder(){
  const board=document.querySelector<HTMLElement>('.leaderboard');if(!board)return;
  board.querySelectorAll('.ladder-row,.ladder-empty').forEach(row=>row.remove());
  const status=document.createElement('p');status.className='ladder-empty';status.textContent='正在读取排行榜…';board.append(status);
  try{
-  const response=await fetch(api,{headers:{apikey:publishableKey,Authorization:'Bearer '+publishableKey}});
+  const response=await fetch(api,{headers:{apikey:publishableKey}});
   if(!response.ok)throw Error('无法读取天梯');
   const entries:Entry[]=await response.json();window.dispatchEvent(new CustomEvent('qiling-ladder',{detail:entries}));status.textContent=entries.length?'':'暂时还没有通过评测的选手。';
   for(const [index,entry] of entries.entries()){

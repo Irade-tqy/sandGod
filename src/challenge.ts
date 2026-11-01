@@ -2,6 +2,7 @@ import {Player} from './game';
 import {SoloGame} from './solo-game';
 import {LadderGame} from './ladder-game';
 import {LadderPlayer} from './ladder-match';
+import {EvaluationInfrastructureError} from './evaluation-errors';
 
 type Endpoint={id:string;endpoint:string};
 type ConnectedPlayer=LadderPlayer & {connect():Promise<void>;close():Promise<void>};
@@ -20,9 +21,10 @@ export async function challengeLadder(id:string,human:Player,weights:number[],st
     await opponent.connect();
     game=new LadderGame(human,opponent,state=>{initial=state;},onError);
     await game.start(weights);
-  } catch {
+  } catch(error) {
     game?.close();
     try{await opponent?.close();}catch{}
+    if(error instanceof EvaluationInfrastructureError)throw Error('天梯网络暂时不可用');
     await store.setMcpStatus(id,'offline');
     throw Error('MCP 选手离线或不可用');
   }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {challengeLadder} from '../src/challenge';
 import {LadderPlayer} from '../src/ladder-match';
+import {EvaluationInfrastructureError} from '../src/evaluation-errors';
 
 void (async()=>{
   const statuses:string[]=[];
@@ -8,7 +9,10 @@ void (async()=>{
   const player:LadderPlayer={async choose(phase,_state,legal){return phase==='weights'?{weights:[25,25,25,25]}:phase==='start'?{col:4}:{action:legal[0]};}};
   const online=()=>({...player,async connect(){},async close(){}});
   const offline=()=>({...player,async connect(){throw Error('unreachable');},async close(){}});
+  const networkFailure=()=>({...player,async connect(){throw new EvaluationInfrastructureError('dns down');},async close(){}});
   await assert.rejects(challengeLadder('entry',0,[0,0,0,100],store,online,()=>{},()=>{}));
+  assert.deepEqual(statuses,[]);
+  await assert.rejects(challengeLadder('entry',0,[25,25,25,25],store,networkFailure,()=>{},()=>{}),/网络/);
   assert.deepEqual(statuses,[]);
   await assert.rejects(challengeLadder('entry',0,[25,25,25,25],store,offline,()=>{},()=>{}),/离线/);
   assert.deepEqual(statuses,['offline']);

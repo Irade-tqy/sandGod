@@ -16,7 +16,7 @@ create index rating_jobs_first_idx on arena_private.rating_jobs(first_player);
 create index rating_jobs_second_idx on arena_private.rating_jobs(second_player);
 
 create or replace function public.arena_finish_mcp(p_submission uuid,p_token uuid,p_accepted boolean,p_error text) returns boolean
-language plpgsql security invoker set search_path = '' as $
+language plpgsql security invoker set search_path = '' as $$
 declare player uuid; opponent uuid;
 begin
  if p_submission is null or p_token is null or p_accepted is null or (p_error is not null and char_length(p_error)>240) then raise exception 'invalid result'; end if;
@@ -29,12 +29,12 @@ begin
  mcp_status=case when p_accepted then 'online' else 'offline' end where p.id=player and p.status='pending';
  if not found then raise exception 'invalid player state'; end if;
  if p_accepted then
-  for opponent in select p.id from public.arena_players p where p.id<>player and p.status='active' and p.kind='mcp' order by random() limit 5 loop
+  for opponent in select p.id from public.arena_players p where p.id<>player and p.status='active' and p.kind in ('c','cpp','mcp') order by random() limit 5 loop
    insert into arena_private.rating_jobs(first_player,second_player) values (player,opponent),(opponent,player);
   end loop;
  end if;
  return true;
-end $;
+end $$;
 
 create function public.arena_claim_rating(p_token uuid)
 returns table(job_id uuid,first_player uuid,second_player uuid)

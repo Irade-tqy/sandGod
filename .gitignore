@@ -8,4 +8,7 @@ dist/
 uploads/
 public/app.js
 public/ladder.js
+public/submission.js
+public/auth-config.js
 public/socket.io.min.js
+public/supabase.js

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {createPublicFetch,createSafeLookup,limitResponse,resolvePublicDns} from '../src/public-fetch';
+import {EvaluationInfrastructureError} from '../src/evaluation-errors';
 
 void (async()=>{
   const mixed=createSafeLookup((_host,cb)=>cb(null,[{address:'8.8.8.8',family:4},{address:'127.0.0.1',family:4}]));
@@ -8,6 +9,8 @@ void (async()=>{
   external('example.com',{},(error,address)=>{assert.equal(error,null);assert.equal(address,'8.8.8.8');});
   const fake:typeof fetch=async input=>new Response(JSON.stringify({Status:0,Answer:[{type:new URL(String(input)).searchParams.get('type')==='1'?1:28,data:new URL(String(input)).searchParams.get('type')==='1'?'8.8.8.8':'2606:4700:4700::1111'}]}));
   assert.deepEqual(await resolvePublicDns('example.com',fake),[{address:'8.8.8.8',family:4},{address:'2606:4700:4700::1111',family:6}]);
+  assert.deepEqual(await resolvePublicDns('missing.example',async()=>new Response('{"Status":3}')),[]);
+  await assert.rejects(resolvePublicDns('example.com',async()=>new Response('',{status:503})),EvaluationInfrastructureError);
   const connection=createPublicFetch('https://example.com/mcp');
   try {
     await assert.rejects(connection.fetch('https://127.0.0.1/mcp'));

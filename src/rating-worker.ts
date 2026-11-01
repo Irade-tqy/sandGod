@@ -1,22 +1,25 @@
 import {randomUUID} from 'node:crypto';
 import {LadderPlayer,playLadderMatch} from './ladder-match';
+import {EvaluationInfrastructureError} from './evaluation-errors';
 
 type ConnectedPlayer=LadderPlayer & {connect():Promise<void>;close():Promise<void>};
-type Store={claimRating(token:string):Promise<{jobId:string;first:string;second:string}|null>;getActiveMcp(id:string):Promise<{id:string;endpoint:string}|null>;finishRating(id:string,token:string,winner:string|null,completed:boolean):Promise<boolean>};
+export type PlayerSource={kind:'mcp';endpoint:string}|{kind:'wasm';id:string;sha256:string};
+type Store={claimRating(token:string):Promise<{jobId:string;first:string;second:string}|null>;getActivePlayer(id:string):Promise<PlayerSource|null>;finishRating(id:string,token:string,winner:string|null,completed:boolean):Promise<boolean>};
 
-export async function processOneRating(store:Store,connect:(endpoint:string)=>ConnectedPlayer,play=playLadderMatch):Promise<boolean>{
+export async function processOneRating(store:Store,connect:(source:PlayerSource)=>Promise<ConnectedPlayer>,play=playLadderMatch):Promise<boolean>{
   const token=randomUUID(),task=await store.claimRating(token);
   if(!task)return false;
+  const entries=await Promise.all([store.getActivePlayer(task.first),store.getActivePlayer(task.second)]);
   const players:ConnectedPlayer[]=[];let winner:string|null=null;
   try{
-    const entries=await Promise.all([store.getActiveMcp(task.first),store.getActiveMcp(task.second)]);
     if(!entries[0]||!entries[1])throw Error('选手不可用');
-    players.push(connect(entries[0].endpoint));
-    players.push(connect(entries[1].endpoint));
-    await Promise.all(players.map(player=>player.connect()));
+    players.push(await connect(entries[0]));
+    players.push(await connect(entries[1]));
+    for(const player of players)await player.connect();
     const result=await play([players[0],players[1]]);
     winner=result.winner===0?task.first:task.second;
-  }catch{
+  }catch(error){
+    if(error instanceof EvaluationInfrastructureError)throw error;
     winner=null;
   }finally{
     await Promise.all(players.map(async player=>{try{await player.close();}catch{}}));
