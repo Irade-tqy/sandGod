@@ -10,10 +10,17 @@ import {verifiedUser} from './user-auth';
 import {SourceStorage} from './source-storage';
 import {isIP} from 'node:net';
 import {ipKeyGenerator} from 'express-rate-limit';
+import ipaddr from 'ipaddr.js';
 
 const secret=process.env.SANDGOD_SUPABASE_SECRET_KEY;
 if(!secret)throw Error('天梯服务未配置数据库密钥');
 const allowedOrigin='https://irade-tqy.github.io';
+const allowedSubmissionOrigins=[allowedOrigin,'http://localhost:3000'];
+function gameOrigin(origin:string|undefined){
+  if(!origin)return false;
+  if(allowedSubmissionOrigins.includes(origin))return true;
+  try{const url=new URL(origin);return url.origin===origin&&url.protocol==='http:'&&url.port==='3000'&&ipaddr.isValid(url.hostname)&&['private','loopback','linkLocal','uniqueLocal'].includes(ipaddr.process(url.hostname).range());}catch{return false;}
+}
 const clientErrors=new Set(['请先结束当前对局','对局设置无效','请等待对局准备完成','请选择起始位置','行动无效','未知操作','天梯选手不可用','MCP 选手离线或不可用','天梯网络暂时不可用','天梯数据库暂时不可用','玩家位置无效','四个方向概率必须是至少 1% 的整数，总和为 100%。','请选择起始行上的位置。','这个行动不可用','对局已关闭']);
 const app=express(), server=createServer(app), store=new LadderStore(secret);
 // Tailscale's HTTP proxy replaces X-Forwarded-For; this server listens only on loopback.
@@ -24,8 +31,9 @@ const storage=sourceEnabled?new SourceStorage(secret):null;
 const source=storage?{reserveSource:store.reserveSource.bind(store),sourceStaging:store.sourceStaging.bind(store),publishSource:store.publishSource.bind(store),cancelSource:store.cancelSource.bind(store),upload:storage.upload.bind(storage)}:undefined;
 server.requestTimeout=30000;
 server.headersTimeout=15000;
-app.use('/api',submissionApi(store,authorization=>verifiedUser(authorization,secret),allowedOrigin,source));
-const io=new Server(server,{maxHttpBufferSize:32768,cors:{origin:allowedOrigin},allowRequest:(request,callback)=>callback(null,request.headers.origin===allowedOrigin)});
+app.get('/healthz',(_req,res)=>res.json({ok:true}));
+app.use('/api',submissionApi(store,authorization=>verifiedUser(authorization,secret),allowedSubmissionOrigins,source));
+const io=new Server(server,{maxHttpBufferSize:32768,cors:{origin:(origin,callback)=>callback(null,gameOrigin(origin))},allowRequest:(request,callback)=>callback(null,gameOrigin(request.headers.origin))});
 const connections=new Map<string,number>();
 io.use((socket,next)=>{
   const forwarded=socket.request.headers['x-forwarded-for'];

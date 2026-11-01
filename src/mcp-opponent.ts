@@ -12,7 +12,7 @@ function infrastructure(error:unknown){let current=error;for(let i=0;i<6&&curren
 export class McpOpponent implements LadderPlayer {
  private client=new Client({name:'qiling-sandbox',version:'1.0.0'});
  private connection:ReturnType<typeof createPublicFetch>;
- constructor(endpoint:string){this.connection=createPublicFetch(endpoint);}
+ constructor(endpoint:string,connectionFactory:typeof createPublicFetch=createPublicFetch){this.connection=connectionFactory(endpoint);}
  async connect(){
   try{
    await this.client.connect(new StreamableHTTPClientTransport(this.connection.url,{fetch:this.connection.fetch}),{timeout:TIMEOUT});

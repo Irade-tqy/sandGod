@@ -21,9 +21,11 @@ int main(void) {
   }
   return 0;
 }`);
-  const player=new WasmOpponent(await compileSource('match.c',source));
-  const result=await playLadderMatch([player,referencePlayer],()=>0.1);
-  assert.ok(result.winner===0||result.winner===1);
-  assert.ok(result.actions>0);
-  console.log('隔离源码完成真实规则对局：',result.actions,'次行动');
+  for(const extension of ['c','cpp']){
+    const player=new WasmOpponent(await compileSource('match.'+extension,source));
+    const result=await playLadderMatch([player,referencePlayer],()=>0.1);
+    assert.ok(result.winner===0||result.winner===1);
+    assert.ok(result.actions>0);
+    console.log(extension,'源码完成真实规则对局：',result.actions,'次行动');
+  }
 })().catch(error=>{console.error(error);process.exitCode=1;});

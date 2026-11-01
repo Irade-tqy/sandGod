@@ -9,12 +9,12 @@ type Verify=(authorization:string|undefined)=>Promise<string|null>;
 type SourceServices={reserveSource(owner:string,name:string,author:string,kind:'c'|'cpp',sha256:string,size:number):Promise<{id:string;path:string}>;sourceStaging(id:string,owner:string):Promise<{id:string;path:string;sha256:string;size:number;kind:'c'|'cpp'}|null>;publishSource(id:string,owner:string):Promise<boolean>;cancelSource(id:string,owner:string):Promise<boolean>;upload(path:string,source:Uint8Array):Promise<void>};
 const knownErrors=new Set(['评测队列已满，请稍后再试','源码暂存空间已满，请稍后再试','今天的提交次数已用完','请等待上一次提交完成']);
 
-export function submissionApi(store:Store,verify:Verify,origin:string,source?:SourceServices){
+export function submissionApi(store:Store,verify:Verify,origin:string|string[],source?:SourceServices){
   const router=express.Router();
   const uploads=new Set<string>();
   router.use((req,res,next)=>{
-    if(req.headers.origin!==origin)return res.status(403).json({error:'来源不允许'});
-    res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');
+    if(!req.headers.origin||!(Array.isArray(origin)?origin:[origin]).includes(req.headers.origin))return res.status(403).json({error:'来源不允许'});
+    res.setHeader('Access-Control-Allow-Origin',req.headers.origin);res.setHeader('Vary','Origin');
     res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type');res.setHeader('Access-Control-Allow-Methods','GET, POST, PUT, DELETE, OPTIONS');
     if(req.method==='OPTIONS')return res.sendStatus(204);
     next();
