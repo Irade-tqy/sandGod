@@ -49,15 +49,17 @@ async function check(origin, backend, returning = false, network = undefined) {
   assert.equal(other.elements['ladder-login'].disabled, true);
   const methods=[];
   const upload=await check('https://irade-tqy.github.io/sandGod/','https://arena.example',false,async(_url,init)=>{
-    methods.push(init.method);
-    return init.method==='POST'?new Response(JSON.stringify({id:'test-id'}),{status:202}):new Response(JSON.stringify({error:'上传状态暂不确定，请稍后检查'}),{status:503});
+    methods.push(init.method||'GET');
+    if(init.method==='POST')return new Response(JSON.stringify({id:'test-id'}),{status:202});
+    if(init.method==='PUT')return new Response(JSON.stringify({error:'上传状态暂不确定，请稍后检查'}),{status:503});
+    return new Response(JSON.stringify({state:'error',error_message:'源码已保留'}),{status:200});
   });
   upload.auth.getSession=async()=>({data:{session:{access_token:'test'}},error:null});
   upload.kind.value='source';upload.elements['submit-name'].value='选手';upload.elements['submit-author'].value='作者';
   upload.elements['submit-file'].files=[{name:'test.c',size:1,arrayBuffer:async()=>new Uint8Array([65]).buffer}];
   upload.elements['submit-form'].onsubmit({preventDefault(){}});
-  for(let i=0;i<50&&upload.elements['submit-button'].disabled;i++)await new Promise(resolve=>setTimeout(resolve,10));
-  assert.deepEqual(methods,['POST','PUT']);
-  assert.equal(upload.elements['submit-status'].textContent,'上传状态暂不确定，请稍后检查');
+  for(let i=0;i<50&&!upload.elements['submit-status'].textContent?.includes('源码已保留');i++)await new Promise(resolve=>setTimeout(resolve,10));
+  assert.deepEqual(methods,['POST','PUT','GET']);
+  assert.ok(upload.elements['submit-status'].textContent.includes('源码已保留'));
   console.log('GitHub login UI checks passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

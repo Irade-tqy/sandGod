@@ -33,7 +33,7 @@ if(config.supabase){
     try{
       const session=(await auth.getSession()).data.session;if(!session)return;
       const result=await request('/api/submissions/'+encodeURIComponent(id),session);
-      const messages:Record<string,string>={staging:'等待上传源码…',pending:'已提交，等待评测…',processing:'正在评测…',accepted:'评测通过，已加入天梯。',rejected:'评测未通过。',error:'评测服务暂时不可用。'};
+      const messages:Record<string,string>={staging:'正在确认上传状态…',pending:'已提交，等待评测…',processing:'正在评测…',accepted:'评测通过，已加入天梯。',rejected:'评测未通过。',error:'评测服务暂时不可用。'};
       const state=String(result?.state||'');status.textContent=messages[state]||'暂时无法读取评测状态。';
       if((state==='rejected'||state==='error')&&typeof result?.error_message==='string')status.textContent+=' '+result.error_message;
       if(state==='accepted')window.dispatchEvent(new Event('qiling-ladder-refresh'));
@@ -63,6 +63,7 @@ if(config.supabase){
         if(typeof result?.id!=='string')throw Error('提交暂时不可用。');
         status.textContent='已提交，等待评测…';void poll(result.id);
       }catch(error){
+        if(reservation&&transferStarted){status.textContent='上传状态尚未确定，正在查询…';void poll(reservation);return;}
         if(reservation&&!transferStarted)void request('/api/submissions/source/'+encodeURIComponent(reservation),session,{method:'DELETE'}).catch(()=>{});
         throw error;
       }
