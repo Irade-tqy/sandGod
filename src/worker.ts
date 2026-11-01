@@ -13,6 +13,7 @@ import {validateCandidate} from './evaluate-ladder';
 import {referencePlayer} from './reference-player';
 import {EvaluationInfrastructureError} from './evaluation-errors';
 import {ReferenceOpponent} from './reference-opponent';
+import {makeRatingRefresh} from './rating-refresh';
 import type {PlayerSource} from './ladder-store';
 
 const secret=process.env.SANDGOD_SUPABASE_SECRET_KEY;
@@ -57,3 +58,5 @@ void (async()=>{
     catch{console.error('源码清理暂时不可用');await sleep(10000);}
   }
 })();
+const refreshRatings=makeRatingRefresh(store);
+void (async()=>{while(running){try{await refreshRatings();}catch{console.error('天梯整体评分暂时不可用');}await sleep(30000);}})();

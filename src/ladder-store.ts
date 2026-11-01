@@ -17,6 +17,18 @@ export class LadderStore {
     if(response.status===204)return null;
     return await response.json() as unknown;
   }
+  async ratingSnapshot(){
+    const result=await this.request('/rest/v1/rpc/arena_rating_snapshot',{method:'POST',body:'{}'});
+    if(!result||typeof result!=='object')throw Error('评分快照无效');
+    const data=result as {match_count?:unknown;ids?:unknown;games?:unknown};
+    if(!Number.isSafeInteger(data.match_count)||!Array.isArray(data.ids)||!Array.isArray(data.games)||data.ids.some(id=>typeof id!=='string'||!UUID.test(id)))throw Error('评分快照无效');
+    const games=data.games.map((item:unknown)=>{if(!item||typeof item!=='object')throw Error('评分对局无效');const g=item as {first?:unknown;second?:unknown;winner?:unknown;count?:unknown};if(typeof g.first!=='string'||typeof g.second!=='string'||!UUID.test(g.first)||!UUID.test(g.second)||!Number.isSafeInteger(g.count)||(g.count as number)<1||(g.winner!==null&&(typeof g.winner!=='string'||!UUID.test(g.winner))))throw Error('评分对局无效');return {first:g.first,second:g.second,winner:g.winner as string|null,count:g.count as number};});
+    if(games.reduce((sum,g)=>sum+g.count,0)!==data.match_count)throw Error('评分快照无效');
+    return {count:data.match_count as number,ids:data.ids as string[],games};
+  }
+  async publishRatings(count:number,results:unknown[]){
+    return await this.request('/rest/v1/rpc/arena_publish_ratings',{method:'POST',body:JSON.stringify({p_match_count:count,p_results:results})})===true;
+  }
   async getActiveMcp(id:string):Promise<{id:string;endpoint:string}|null>{
     if(!UUID.test(id))return null;
     const result=await this.request('/rest/v1/arena_worker_endpoints?select=id,endpoint&id=eq.'+id+'&order=created_at.desc&limit=1');

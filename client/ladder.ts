@@ -1,7 +1,7 @@
 export {};
-const api='https://icmudmlyhkxmiyeqwuvi.supabase.co/rest/v1/arena_players?select=id,name,author_name,kind,mcp_status,rating,matches&status=eq.active&order=rating.desc';
+const api='https://icmudmlyhkxmiyeqwuvi.supabase.co/rest/v1/arena_players?select=id,name,author_name,kind,mcp_status,rating,rating_lower,rating_upper,matches&status=eq.active&order=rating.desc';
 import {publishableKey} from './auth-config.js';
-type Entry={id:string;name:string;author_name:string;kind:'c'|'cpp'|'mcp'|'reference';mcp_status:'online'|'offline'|'unchecked'|null;rating:number;matches:number};
+type Entry={id:string;name:string;author_name:string;kind:'c'|'cpp'|'mcp'|'reference';mcp_status:'online'|'offline'|'unchecked'|null;rating:number;rating_lower:number|null;rating_upper:number|null;matches:number};
 const refreshButton=document.querySelector<HTMLButtonElement>('#ladder-refresh');
 let loading=false,pendingRefresh=false,cooldownUntil=0,cooldownTimer:number|undefined;
 function updateRefreshButton(){
@@ -29,7 +29,7 @@ async function loadLadder(){
    const avatar=document.createElement('span');avatar.className='avatar avatar-green';avatar.textContent=entry.name.slice(0,1);
    const labels=document.createElement('span'),name=document.createElement('strong'),author=document.createElement('small');name.textContent=entry.name;author.textContent='by '+entry.author_name;labels.append(name,author);identity.append(rank,avatar,labels);
    const type=document.createElement('span'),badge=document.createElement('em');badge.className='kind'+(entry.kind==='reference'||entry.kind==='mcp'&&entry.mcp_status==='online'?' online':'');badge.textContent=entry.kind==='reference'?'参考策略 · 可对战':entry.kind==='mcp'?(entry.mcp_status==='online'?'MCP · 可对战':entry.mcp_status==='offline'?'MCP 离线':'MCP · 尚未检测'):entry.kind.toUpperCase()+' · 仅评测';type.append(badge);
-   const matches=document.createElement('span');matches.textContent=String(entry.matches);const rating=document.createElement('strong');rating.className='rating';rating.textContent=Math.round(entry.rating).toLocaleString();row.append(identity,type,matches,rating);board.append(row);
+   const matches=document.createElement('span');matches.textContent=String(entry.matches);const rating=document.createElement('strong');rating.className='rating';rating.textContent=Math.round(entry.rating).toLocaleString();const interval=document.createElement('small');interval.className='rating-interval';interval.textContent=entry.rating_lower===null||entry.rating_upper===null?'待评估':`${Math.round(entry.rating_lower)} – ${Math.round(entry.rating_upper)}`;interval.title='评分估计区间';rating.append(interval);row.append(identity,type,matches,rating);board.append(row);
   }
  }catch{status.textContent='排行榜暂时不可用，请稍后重试。';}
  finally{loading=false;updateRefreshButton();if(pendingRefresh){pendingRefresh=false;void loadLadder();}}
