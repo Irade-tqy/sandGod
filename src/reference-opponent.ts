@@ -11,7 +11,7 @@ function modelOpponent(player:Player):ModelOpponent{
   const app=process.env.SANDGOD_LOCAL_MODEL_APP;
   if(!app||!isAbsolute(app))throw Error('本地参考策略未配置');
   const localRequire=createRequire(resolve(app,'package.json'));
-  const LocalOpponent=(localRequire('./dist/src/opponent.js') as LocalModule).Opponent;
+  const LocalOpponent=(localRequire('./dist/opponent.js') as LocalModule).Opponent;
   if(typeof LocalOpponent!=='function')throw Error('本地参考策略不可用');
   return new LocalOpponent('latest',player);
 }
