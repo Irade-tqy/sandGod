@@ -1,7 +1,7 @@
 declare function io(uri?:string,options?:{autoConnect?:boolean}): any;
 type Wall={id:number;orientation:number;row:number;col:number;length:number;owned?:boolean;opponentOwned?:boolean};
-type Frame={positions:[number,number];player:number|null;action:number|null;boundary?:number;removedWalls?:number[]};
-type State={gameId:string;ready:boolean;chosen:boolean;position:number|null;walls:Wall[];legal:number[];turn:string;winner:number|null;inventory:number;opponentInventory:number;ownFirst?:boolean;unlimitedWalls?:boolean;ownWallCount?:number;opponentWallCount?:number;boundary?:number;rounds?:number;manualAvailable?:boolean;pendingManual?:boolean;canPass?:boolean;history:{player:number;text:string}[];opponentPosition:number|null;replay?:Frame[]};
+type Frame={positions:[number,number];player:number|null;action:number|null;boundary?:number;removedWalls?:number[];debris?:{q:number;k:number}[]};
+type State={debris?:{q:number;k:number}[];gameId:string;ready:boolean;chosen:boolean;position:number|null;walls:Wall[];legal:number[];turn:string;winner:number|null;inventory:number;opponentInventory:number;ownFirst?:boolean;unlimitedWalls?:boolean;ownWallCount?:number;opponentWallCount?:number;boundary?:number;rounds?:number;manualAvailable?:boolean;pendingManual?:boolean;canPass?:boolean;history:{player:number;text:string}[];opponentPosition:number|null;replay?:Frame[]};
 type Tab='solo'|'rules'|'ladder';
 type SavedReplay={mode:Tab;state:State;savedAt:number};
 const serverAddress=(window as Window & {SANDGOD_GAME_SERVER?:string}).SANDGOD_GAME_SERVER||'';
@@ -38,11 +38,14 @@ const ns='http://www.w3.org/2000/svg';
 function node(tag:string,attrs:Record<string,string|number>){const n=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,String(v));el('board').appendChild(n);return n;}
 function near(q:number,k:number){const r=Math.floor(q/9),c=q%9;return [r?q-9:-1,c<8?q+1:-1,r<8?q+9:-1,c?q-1:-1][k];}
 function drawWall(w:Wall,css:string){const x=w.col*100,y=w.row*100;if(w.orientation===0)node('line',{x1:x+4,y1:y+100,x2:x+296,y2:y+100,class:css});else node('line',{x1:x+100,y1:y+4,x2:x+100,y2:y+296,class:css});}
-function drawWalls(list:Wall[]){
+function drawWalls(list:Wall[],debris:{q:number;k:number}[]){
+ const dead=new Set(debris.map(e=>`${e.q}:${e.k}`));
+ for(const {q,k} of debris){const x=q%9*100,y=Math.floor(q/9)*100;if(k===2)node('line',{x1:x,y1:y+100,x2:x+100,y2:y+100,class:'wall-debris'});else node('line',{x1:x+100,y1:y,x2:x+100,y2:y+100,class:'wall-debris'});}
  const edges=new Map<string,{orientation:number;row:number;col:number;own:boolean;opponent:boolean}>();
- for(const w of list)for(let j=0;j<3;j++){const row=w.row+(w.orientation?j:0),col=w.col+(w.orientation?0:j),key=`${w.orientation}:${row}:${col}`;const edge=edges.get(key)||{orientation:w.orientation,row,col,own:false,opponent:false};edge.own||=!!w.owned;edge.opponent||=!!w.opponentOwned;if(!w.owned&&!w.opponentOwned)edge.opponent=true;edges.set(key,edge);}
+ for(const w of list){let hasDebris=false;for(let j=0;j<3;j++){const row=w.row+(w.orientation?j:0),col=w.col+(w.orientation?0:j),q=row*9+col,k=w.orientation?1:2;if(dead.has(`${q}:${k}`)){hasDebris=true;continue;}const key=`${w.orientation}:${row}:${col}`;const edge=edges.get(key)||{orientation:w.orientation,row,col,own:false,opponent:false};edge.own||=!!w.owned;edge.opponent||=!!w.opponentOwned;if(!w.owned&&!w.opponentOwned)edge.opponent=true;edges.set(key,edge);}if(hasDebris){const x=w.col*100+(w.orientation?100:0),y=w.row*100+(w.orientation?0:100);for(const n of [0,3])node('circle',{cx:x+(w.orientation?0:n*100),cy:y+(w.orientation?n*100:0),r:7,class:'debris-end'});}}
  for(const edge of edges.values())for(const side of ['own','opponent'] as const){if(!edge[side])continue;const both=edge.own&&edge.opponent,offset=both?(side==='own'?-5:5):0,x=edge.col*100,y=edge.row*100,klass=`wall ${side}-wall${both?' shared-wall':''}`;if(edge.orientation===0)node('line',{x1:x,y1:y+100+offset,x2:x+100,y2:y+100+offset,class:klass});else node('line',{x1:x+100+offset,y1:y,x2:x+100+offset,y2:y+100,class:klass});}
 }
+
 function render(){
  const s=active();if(!s){el('turn').textContent='等待开始';el('hint').textContent='选择先手或后手开始。';el('your-walls-title').textContent='先手的墙';el('opponent-walls-title').textContent='后手的墙';for(const id of ['your-steps','opponent-steps','your-walls','opponent-walls'])el(id).textContent='0';el('pass-turn').hidden=el('skip-manual').hidden=true;el('replay-tools').hidden=true;for(const b of document.querySelectorAll<HTMLButtonElement>('[data-mode],#reset'))b.disabled=true;el('board').replaceChildren();for(let i=1;i<9;i++){node('line',{x1:i*100,y1:0,x2:i*100,y2:900,class:'grid-line'});node('line',{x1:0,y1:i*100,x2:900,y2:i*100,class:'grid-line'});}return;}
  const replay=s.winner!==null?s.replay:undefined;
@@ -50,7 +53,7 @@ function render(){
  if(replay){const slider=el('replay-slider') as HTMLInputElement;slider.max=String(replay.length-1);slider.value=String(replayIndex??replay.length-1);el('replay-label').textContent=`${slider.value} / ${slider.max}`;}
  const frame=replay&&replayIndex!==null?replay[replayIndex]:null;
  let replayWalls:Wall[]|null=null;if(replay&&(frame||s.walls.some(w=>w.owned===undefined||w.opponentOwned===undefined))){const counts=[Array(112).fill(0),Array(112).fill(0)],end=frame?replayIndex!:replay.length-1;for(const row of replay.slice(1,end+1)){for(const id of row.removedWalls??[])counts[0][id]=counts[1][id]=0;if(row.action===null||row.player===null||row.action<4)continue;const removing=row.action>=116,id=removing?row.action-116:row.action-4;counts[row.player][id]+=removing?-1:1;}replayWalls=walls.filter(w=>counts[0][w.id]+counts[1][w.id]>0).map(w=>({...w,owned:counts[0][w.id]>0,opponentOwned:counts[1][w.id]>0}));}
- const own=s.ownFirst===false?'后手':'先手',other=s.ownFirst===false?'先手':'后手';el('my-history-title').textContent=own+'行动';el('their-history-title').textContent=other+'行动';
+ const own=s.ownFirst===false?'后手':'先手',other=s.ownFirst===false?'先手':'后手';el('my-history').parentElement!.dataset.order=s.ownFirst===false?'second':'first';el('their-history').parentElement!.dataset.order=s.ownFirst===false?'first':'second';el('my-history-title').textContent=own+'行动';el('their-history-title').textContent=other+'行动';
  for(const [id,p] of [['my-history',0],['their-history',1]] as const){const root=el(id);root.replaceChildren();for(const entry of s.history.filter(x=>x.player===p)){const li=document.createElement('li');li.textContent=entry.text.replace(/^你/,own).replace(/^对手/,other);root.append(li);}if(!root.childElementCount){const li=document.createElement('li');li.className='muted';li.textContent='尚无行动。';root.append(li);}}
  el('turn').textContent=!s.ready?(!s.chosen?`${own}选择起始位置`:`等待${other}选择`):s.winner!==null?`${s.winner===0?own:other}获胜`:s.turn==='you'?`轮到${own}`:`轮到${other}`;
  el('your-steps').textContent=String(s.history.filter(e=>e.player===0&&e.text.includes('移动了一步')).length);
@@ -59,15 +62,15 @@ function render(){
  el('opponent-walls').textContent=String(s.unlimitedWalls?s.opponentWallCount:s.opponentInventory);
  el('your-walls').textContent=String(s.unlimitedWalls?s.ownWallCount:s.inventory);
  if(s.pendingManual)mode='move';else if(mode==='move')mode='horizontal';
- el('hint').textContent=!s.chosen?'点击下方起始行选择位置。':!s.ready?`等待${other}选择起始位置。`:s.turn==='you'?(s.pendingManual?'点击可到达的相邻格，或选择随机移动。':s.canPass?'棋盘只剩一列，继续移动。':manualArmed?'选择墙后，再选择移动方向。':mode==='remove'?'点击标出的墙进行拆除。':'点击棋盘放置墙。'):'';
+ el('hint').textContent=!s.chosen?'点击下方起始行选择位置。':!s.ready?`等待${other}选择起始位置。`:s.turn==='you'?(s.pendingManual?'点击可到达的相邻格，或选择随机移动。':s.canPass?(s.boundary===4?'棋盘只剩一列，继续移动。':'没有可用的墙，继续随机移动。'):manualArmed?'选择墙后，再选择移动方向。':mode==='remove'?'点击标出的墙进行拆除。':'点击棋盘放置墙。'):'';
  for(const b of document.querySelectorAll<HTMLButtonElement>('[data-mode]')){b.disabled=s.turn!=='you'||!!s.pendingManual||!!s.canPass||(b.dataset.mode==='remove'?!s.legal.some(a=>a>=116):b.dataset.mode!=='move'&&!s.unlimitedWalls&&s.inventory===0);b.classList.toggle('selected',b.dataset.mode===mode);b.setAttribute('aria-pressed',String(b.dataset.mode===mode));}
- const manual=el('reset') as HTMLButtonElement;manual.disabled=!s.manualAvailable||!!s.pendingManual;manual.classList.toggle('selected',manualArmed&&!manual.disabled);manual.setAttribute('aria-pressed',String(manualArmed&&!manual.disabled));el('pass-turn').hidden=!s.canPass;el('skip-manual').hidden=!s.pendingManual;el('shrink-count').textContent=(s.boundary??0)>=4?'单列':String(20-(s.rounds??0)%20);
+ const manual=el('reset') as HTMLButtonElement;manual.disabled=!s.manualAvailable||!!s.pendingManual;manual.classList.toggle('selected',manualArmed&&!manual.disabled);manual.setAttribute('aria-pressed',String(manualArmed&&!manual.disabled));el('pass-turn').hidden=!s.canPass;el('skip-manual').hidden=!s.pendingManual;el('shrink-count').textContent=(s.boundary??0)>=4?'单列':String(10-(s.rounds??0)%10);
  el('board').replaceChildren();
  const boundary=frame?replay!.slice(0,replayIndex!+1).reduce((n,row)=>row.boundary??n,0):s.boundary??0;if(boundary){node('rect',{x:0,y:0,width:boundary*100,height:900,class:'outside-board'});node('rect',{x:(9-boundary)*100,y:0,width:boundary*100,height:900,class:'outside-board'});}
  if(!s.chosen)for(let c=0;c<9;c++)node('rect',{x:c*100,y:800,width:100,height:100,class:'setup-cell'});
  if(s.turn==='you'&&mode==='move'&&s.position!==null)for(const a of s.legal.filter(x=>x<4)){const q=near(s.position,a);node('rect',{x:q%9*100,y:Math.floor(q/9)*100,width:100,height:100,class:'legal-cell'});}
  for(let i=1;i<9;i++){node('line',{x1:i*100,y1:0,x2:i*100,y2:900,class:'grid-line'});node('line',{x1:0,y1:i*100,x2:900,y2:i*100,class:'grid-line'});}
- if(hover!==null&&s.turn==='you'&&mode!=='move'&&mode!=='remove')drawWall(walls[hover],s.legal.includes(hover+4)?'wall-preview valid':'wall-preview');drawWalls(replayWalls??s.walls);if(hover!==null&&s.turn==='you'&&mode==='remove')drawWall(walls[hover],'wall-preview removal-preview');
+ if(hover!==null&&s.turn==='you'&&mode!=='move'&&mode!=='remove')drawWall(walls[hover],s.legal.includes(hover+4)?'wall-preview valid':'wall-preview');const debris=frame&&replay?replay.slice(0,replayIndex!+1).reduce((previous,row)=>row.debris??previous,[] as {q:number;k:number}[]):s.debris??[];drawWalls(replayWalls??s.walls,debris);if(hover!==null&&s.turn==='you'&&mode==='remove')drawWall(walls[hover],'wall-preview removal-preview');
  const ownPosition=frame?frame.positions[0]:s.position,opponent=frame?frame.positions[1]:s.opponentPosition;
  if(ownPosition!==null){const q=ownPosition;node('circle',{cx:(q%9+.5)*100,cy:(Math.floor(q/9)+.5)*100,r:28,class:'player-ring'});node('circle',{cx:(q%9+.5)*100,cy:(Math.floor(q/9)+.5)*100,r:24,class:'player'});}
  if(opponent!==null){const q=opponent;node('circle',{cx:(q%9+.5)*100,cy:(Math.floor(q/9)+.5)*100,r:28,class:'enemy'});}

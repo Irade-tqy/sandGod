@@ -27,3 +27,7 @@
 
 .protocol-download{margin-top:20px}.protocol-download a,.protocol-link{font-size:13px;font-weight:700;color:var(--petrol);text-underline-offset:4px}.protocol-link{display:block;text-align:center;margin-top:18px}
 .submit-form{display:grid;gap:12px;margin-top:16px}.submit-form>label{display:grid;gap:5px;font-size:13px;font-weight:700;color:var(--petrol)}.submit-form input:not([type=radio]){width:100%;min-width:0;padding:9px;border:1px solid #b8c7b8;border-radius:7px;background:#fbfcf8;color:var(--ink);font:inherit}.submit-form fieldset{border:0;padding:0;margin:0;display:flex;gap:18px}.submit-form legend{font-size:13px;font-weight:700;color:var(--petrol);margin-bottom:5px}.submit-form small,.submit-status{font-size:12px;color:var(--secondary)}.submit-status{margin-top:10px;overflow-wrap:anywhere}.submit-form .preview-button{margin-top:0}.ladder-empty{padding:22px 16px;color:var(--secondary);font-size:14px}
+
+#game-settings{display:block;margin:0 0 12px auto}.sandbox-board .wall-preview:not(.valid):not(.removal-preview){stroke:#b32f53}.history-column[data-order="first"] .history-list li::before{background:var(--petrol)}.history-column[data-order="second"] .history-list li::before{background:var(--terracotta)}
+
+.sandbox-board .wall-debris{stroke:#c9ccc8;stroke-width:9;stroke-linecap:round;pointer-events:none}.sandbox-board .debris-end{fill:#537b5b;pointer-events:none}

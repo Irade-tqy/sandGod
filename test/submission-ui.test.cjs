@@ -3,17 +3,18 @@ const {readFileSync} = require('node:fs');
 const vm = require('node:vm');
 const {webcrypto} = require('node:crypto');
 
-async function check(origin, backend, returning = false, network = undefined) {
+async function check(origin, backend, returning = false, network = undefined, savedId = null, initialSession = null) {
   const ids = ['ladder-login','ladder-logout','submit-form','submit-status','submit-button','submit-source-choice','submit-endpoint','submit-file','submit-source-field','submit-mcp-field','submit-name','submit-author'];
   const elements = Object.fromEntries(ids.map(id => [id, {}]));
   const kind = {value: 'mcp'};
   elements['submit-form'].elements = {namedItem: () => kind};
   elements['submit-form'].querySelectorAll = () => [];
   const items = new Map(returning ? [['qiling-login-return','ladder']] : []);
+  if(savedId)items.set('qiling-submission-id',savedId);
   const storage = {getItem: key => items.get(key) || null, setItem: (key, value) => items.set(key, value), removeItem: key => items.delete(key)};
   let callback, loginOptions, tabOpened = false;
   const auth = {
-    getSession: async () => ({data: {session: null}, error: null}),
+    getSession: async () => ({data: {session: initialSession}, error: null}),
     onAuthStateChange: cb => { callback = cb; },
     signInWithOAuth: async options => { loginOptions = options; return {error: null}; },
     signOut: async () => { callback('SIGNED_OUT', null); return {error: null}; }
@@ -22,7 +23,7 @@ async function check(origin, backend, returning = false, network = undefined) {
   const location = new URL(origin);
   const document = {getElementById: id => elements[id], querySelector: () => ({click: () => { tabOpened = true; }})};
   const source = readFileSync('public/submission.js', 'utf8').replace(/^import .*\n/, "const publishableKey = 'test';\n");
-  vm.runInNewContext(source, {window, document, location, sessionStorage: storage, URL, setTimeout, fetch: network, crypto: webcrypto, Uint8Array});
+  vm.runInNewContext(source, {window, document, location, sessionStorage: storage, URL, setTimeout, clearTimeout, fetch: network, crypto: webcrypto, Uint8Array});
   await Promise.resolve();
   return {elements, callback, storage, auth, kind, getLoginOptions: () => loginOptions, tabOpened};
 }
@@ -61,5 +62,13 @@ async function check(origin, backend, returning = false, network = undefined) {
   for(let i=0;i<50&&!upload.elements['submit-status'].textContent?.includes('源码已保留');i++)await new Promise(resolve=>setTimeout(resolve,10));
   assert.deepEqual(methods,['POST','PUT','GET']);
   assert.ok(upload.elements['submit-status'].textContent.includes('源码已保留'));
+  const calls=[];
+  const resumed=await check('https://irade-tqy.github.io/sandGod/','https://arena.example',false,async url=>{
+    calls.push(url);return new Response(JSON.stringify({state:'rejected',error_message:'测试结果'}),{status:200});
+  },'saved-id',{access_token:'test'});
+  resumed.callback('TOKEN_REFRESHED',{access_token:'test'});
+  for(let i=0;i<50&&!resumed.elements['submit-status'].textContent?.includes('测试结果');i++)await new Promise(resolve=>setTimeout(resolve,10));
+  assert.equal(calls.length,1);assert.ok(calls[0].endsWith('/api/submissions/saved-id'));
+  resumed.callback('SIGNED_OUT',null);assert.equal(resumed.storage.getItem('qiling-submission-id'),null);
   console.log('GitHub login UI checks passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });
