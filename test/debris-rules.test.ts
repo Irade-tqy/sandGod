@@ -17,7 +17,7 @@ assert.equal(game.snapshot(0).debris.length,3);
 const mirrored=WALLS[transform(wall+4,1)-4];
 assert.ok(game.snapshot(1).debris.every(({q,k})=>mirrored.edges.some(([x,y])=>x===q&&y===k)));
 game.turn=0;game.positions[0]=40;game.act(0,4+wall);
-assert.equal(game.positions[0],39);
+assert.equal(game.positions[0],31);
 assert.ok(game.moves(0).includes(1));
 const partial=WALLS.findIndex((w,id)=>id!==wall&&w.orientation===WALLS[wall].orientation&&w.edges.filter(([q,k])=>WALLS[wall].edges.some(([x,y])=>q===x&&k===y)).length===2);
 game.turn=0;game.positions[0]=40;assert.ok(game.legal(0).includes(4+partial));game.act(0,4+partial);

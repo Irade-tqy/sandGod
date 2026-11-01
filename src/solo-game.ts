@@ -22,7 +22,7 @@ export class SoloGame extends Game {
  get manualAvailable(){return false;}
  policyAction(a:number,p:Player){return (this.pendingManual||this.canPass)&&a===4?4:transform(a,p);}
  moves(p:Player){const board=geometry(this.walls,this.boundary,this.debris),q=this.positions[p]!,result:number[]=[];for(let k=0;k<4;k++)if(neighbor(q,k)>=0&&!board.blocked[q][k])result.push(k);return result;}
- preferredMoves(p:Player,q:number,moves:number[],debris=this.debris,action?:number){const preferred=moves.filter(k=>{const opposite=(k+2)%4,start=opposite===0||opposite===3?neighbor(q,opposite):q,edge=opposite===0?2:opposite===3?1:opposite;if(start<0||!debris.has(`${start}:${edge}`))return false;return WALLS.some((wall,id)=>{let count=this.owned[p][id];if(action!==undefined&&!this.canPass){if(action===4+id)count++;else if(action===116+id)count--;}return count>0&&wall.edges.some(([x,y])=>x===start&&y===edge);});});return preferred.length?preferred:moves;}
+ preferredMoves(p:Player,q:number,moves:number[],debris=this.debris,action?:number){const preferred=moves.filter(k=>{const start=k===0||k===3?neighbor(q,k):q,edge=k===0||k===2?2:1;if(start<0||!debris.has(`${start}:${edge}`))return true;return !WALLS.some((wall,id)=>{let count=this.owned[p][id];if(action!==undefined&&!this.canPass){if(action===4+id)count++;else if(action===116+id)count--;}return count>0&&wall.edges.some(([x,y])=>x===start&&y===edge);});});return preferred.length?preferred:moves;}
  private wallActions(p:Player):number[]{
   const result:number[]=[],own=new Set<number>(),otherEdges=new Set<string>();for(let w=0;w<112;w++){if(this.owned[p][w])own.add(w);if(this.owned[1-p][w])for(const [q,k] of WALLS[w].edges)otherEdges.add(`${q}:${k}`);}
   for(let w=0;w<112;w++){
