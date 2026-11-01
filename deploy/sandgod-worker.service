@@ -11,6 +11,8 @@ Environment=SANDGOD_LOCAL_MODEL_APP=/home/irade/sandGod/typescript-app
 ExecStart=/usr/bin/node /home/irade/github/sandGod/deploy/service.cjs worker
 Restart=on-failure
 RestartSec=5
+KillMode=mixed
+TimeoutStopSec=16min
 NoNewPrivileges=true
 UMask=0077
 
