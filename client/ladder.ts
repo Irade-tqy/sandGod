@@ -2,8 +2,20 @@ export {};
 const api='https://icmudmlyhkxmiyeqwuvi.supabase.co/rest/v1/arena_players?select=id,name,author_name,kind,mcp_status,rating,matches&status=eq.active&order=rating.desc';
 import {publishableKey} from './auth-config.js';
 type Entry={id:string;name:string;author_name:string;kind:'c'|'cpp'|'mcp'|'reference';mcp_status:'online'|'offline'|'unchecked'|null;rating:number;matches:number};
+const refreshButton=document.querySelector<HTMLButtonElement>('#ladder-refresh');
+let loading=false,pendingRefresh=false,cooldownUntil=0,cooldownTimer:number|undefined;
+function updateRefreshButton(){
+ if(!refreshButton)return;
+ if(cooldownTimer!==undefined)window.clearTimeout(cooldownTimer);
+ const wait=Math.max(0,cooldownUntil-Date.now());
+ refreshButton.disabled=loading||wait>0;
+ refreshButton.textContent=loading?'刷新中…':wait>0?'稍候':'刷新';
+ if(wait>0)cooldownTimer=window.setTimeout(updateRefreshButton,wait);
+}
 async function loadLadder(){
  const board=document.querySelector<HTMLElement>('.leaderboard');if(!board)return;
+ if(loading){pendingRefresh=true;return;}
+ loading=true;updateRefreshButton();
  board.querySelectorAll('.ladder-row,.ladder-empty').forEach(row=>row.remove());
  const status=document.createElement('p');status.className='ladder-empty';status.textContent='正在读取排行榜…';board.append(status);
  try{
@@ -20,7 +32,9 @@ async function loadLadder(){
    const matches=document.createElement('span');matches.textContent=String(entry.matches);const rating=document.createElement('strong');rating.className='rating';rating.textContent=Math.round(entry.rating).toLocaleString();row.append(identity,type,matches,rating);board.append(row);
   }
  }catch{status.textContent='排行榜暂时不可用，请稍后重试。';}
+ finally{loading=false;updateRefreshButton();if(pendingRefresh){pendingRefresh=false;void loadLadder();}}
 }
+refreshButton?.addEventListener('click',()=>{if(loading||Date.now()<cooldownUntil)return;cooldownUntil=Date.now()+1000;void loadLadder();});
 void loadLadder();
 window.addEventListener('qiling-ladder-refresh',()=>{void loadLadder();});
 
