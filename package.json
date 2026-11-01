@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "scripts": {
     "build": "tsc && tsc -p tsconfig.client.json && cp node_modules/socket.io-client/dist/socket.io.min.js public/socket.io.min.js",
-    "test": "npm run build && node dist/test/strategy-protocol.test.js && node dist/test/ladder-rating.test.js && node dist/test/ladder-match.test.js && node dist/test/evaluate-ladder.test.js && node dist/test/ladder-game.test.js && node dist/test/challenge.test.js && node dist/test/ladder-store.test.js && node dist/test/ladder-status.test.js && node dist/test/ladder-submission.test.js && node dist/test/public-address.test.js && node dist/test/public-fetch.test.js && node dist/test/server.test.js"
+    "test": "npm run build && node dist/test/strategy-protocol.test.js && node dist/test/ladder-rating.test.js && node dist/test/ladder-match.test.js && node dist/test/evaluate-ladder.test.js && node dist/test/ladder-game.test.js && node dist/test/challenge.test.js && node dist/test/mcp-worker.test.js && node dist/test/rating-worker.test.js && node dist/test/ladder-store.test.js && node dist/test/ladder-status.test.js && node dist/test/ladder-submission.test.js && node dist/test/public-address.test.js && node dist/test/public-fetch.test.js && node dist/test/user-auth.test.js && node dist/test/submission-api.test.js && node dist/test/server.test.js"
   },
   "devDependencies": {
     "@types/express": "5.0.6",
@@ -14,6 +14,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
     "express": "5.3.0",
+    "express-rate-limit": "8.7.2",
     "ipaddr.js": "2.2.0",
     "socket.io": "4.8.4",
     "socket.io-client": "4.8.4",

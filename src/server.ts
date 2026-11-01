@@ -5,12 +5,15 @@ import {challengeLadder} from './challenge';
 import {LadderStore} from './ladder-store';
 import {McpOpponent} from './mcp-opponent';
 import {Player} from './game';
+import {submissionApi} from './submission-api';
+import {verifiedUser} from './user-auth';
 
 const secret=process.env.SANDGOD_SUPABASE_SECRET_KEY;
 if(!secret)throw Error('天梯服务未配置数据库密钥');
 const allowedOrigin='https://irade-tqy.github.io';
 const clientErrors=new Set(['请先结束当前对局','对局设置无效','请等待对局准备完成','请选择起始位置','行动无效','未知操作','天梯选手不可用','MCP 选手离线或不可用','天梯数据库暂时不可用','玩家位置无效','四个方向概率必须是至少 1% 的整数，总和为 100%。','请选择起始行上的位置。','这个行动不可用','对局已关闭']);
 const app=express(), server=createServer(app), store=new LadderStore(secret);
+app.use('/api',submissionApi(store,authorization=>verifiedUser(authorization,secret),allowedOrigin));
 const io=new Server(server,{maxHttpBufferSize:32768,cors:{origin:allowedOrigin},allowRequest:(request,callback)=>callback(null,request.headers.origin===allowedOrigin)});
 const connections=new Map<string,number>();
 io.use((socket,next)=>{

@@ -8,7 +8,8 @@ void (async()=>{
     calls++;
     assert.ok(String(input).startsWith('https://icmudmlyhkxmiyeqwuvi.supabase.co/rest/v1/'));
     assert.equal(init?.redirect,'error');
-    return new Response(JSON.stringify(init?.method==='PATCH'?[{id}]:[{id,endpoint:'https://example.com/mcp'}]),{status:200});
+    const row=String(input).includes('arena_submission_status')?{id,state:'pending',endpoint:'private',owner_id:'private'}:{id,endpoint:'https://example.com/mcp'};
+    return new Response(JSON.stringify(init?.method==='PATCH'?[{id}]:[row]),{status:200});
   };
   try{
     const store=new LadderStore('test-only');
@@ -22,5 +23,7 @@ void (async()=>{
     const other='00000000-0000-0000-0000-000000000002';
     await store.recordMatch(id,id,other,id);
     assert.equal(calls,3);
+    const status=await store.getSubmission(id,id);
+    assert.ok(status && !('endpoint' in status) && !('owner_id' in status));
   }finally{globalThis.fetch=original;}
 })().catch(error=>{console.error(error);process.exitCode=1;});
