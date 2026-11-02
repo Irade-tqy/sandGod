@@ -5,7 +5,7 @@ import {Choice,LadderPlayer} from './ladder-match';
 import {SoloGame} from './solo-game';
 
 type ModelOpponent={chooseWeights(game:SoloGame,difficulty:number):Promise<number[]>;chooseStart(game:SoloGame,difficulty:number):Promise<number>;choose(game:SoloGame,difficulty:number):Promise<number>;close():void};
-type LocalModule={Opponent?:new(profile:'latest',player:Player)=>ModelOpponent};
+type LocalModule={Opponent?:new(profile:'arena',player:Player)=>ModelOpponent};
 
 function modelOpponent(player:Player):ModelOpponent{
   const app=process.env.SANDGOD_LOCAL_MODEL_APP;
@@ -13,7 +13,7 @@ function modelOpponent(player:Player):ModelOpponent{
   const localRequire=createRequire(resolve(app,'package.json'));
   const LocalOpponent=(localRequire('./dist/opponent.js') as LocalModule).Opponent;
   if(typeof LocalOpponent!=='function')throw Error('本地参考策略不可用');
-  return new LocalOpponent('latest',player);
+  return new LocalOpponent('arena',player);
 }
 
 export function visibleGame(game:SoloGame,player:Player):SoloGame{
