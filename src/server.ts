@@ -5,6 +5,8 @@ import {challengeLadder} from './challenge';
 import {LadderStore} from './ladder-store';
 import {McpOpponent} from './mcp-opponent';
 import {ReferenceOpponent} from './reference-opponent';
+import {ArtifactStore} from './artifact-store';
+import {OnlineWasmOpponent,WasmSlots} from './online-wasm';
 import type {PlayerSource} from './ladder-store';
 import {Player} from './game';
 import {submissionApi} from './submission-api';
@@ -30,6 +32,7 @@ const app=express(), server=createServer(app), store=new LadderStore(secret);
 app.set('trust proxy',1);
 const sourceEnabled=process.env.SANDGOD_ENABLE_SOURCE_EVAL==='1';
 if(sourceEnabled&&!process.env.SANDGOD_ARTIFACT_DIR)throw Error('源码评测目录未配置');
+const artifacts=process.env.SANDGOD_ARTIFACT_DIR?new ArtifactStore(process.env.SANDGOD_ARTIFACT_DIR):null,wasmSlots=new WasmSlots();
 const storage=sourceEnabled?new SourceStorage(secret):null;
 const source=storage?{reserveSource:store.reserveSource.bind(store),sourceStaging:store.sourceStaging.bind(store),publishSource:store.publishSource.bind(store),cancelSource:store.cancelSource.bind(store),upload:storage.upload.bind(storage)}:undefined;
 server.requestTimeout=30000;
@@ -68,6 +71,7 @@ io.on('connection',socket=>{
           const created=await challengeLadder(input.entryId,input.human as Player,input.weights,store,source=>{
             if(source.kind==='reference')return new ReferenceOpponent();
             if(source.kind==='mcp')return new McpOpponent(source.endpoint);
+            if(artifacts)return new OnlineWasmOpponent(artifacts,source.id,source.sha256,wasmSlots);
             throw Error('天梯选手不可用');
           },state=>socket.emit('state',{mode:'solo',state}),()=>socket.emit('game-error','天梯选手暂时不可用。'));
           if(!socket.connected){await created.close();return;}

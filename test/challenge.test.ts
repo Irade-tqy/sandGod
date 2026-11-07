@@ -27,4 +27,9 @@ void (async()=>{
   await reference.close();
   await assert.rejects(challengeLadder('reference',0,[25,25,25,25],store,offline,()=>{},()=>{}),/参考策略/);
   assert.deepEqual(statuses,['offline','online']);
+  source={kind:'wasm',id:'00000000-0000-0000-0000-000000000001',sha256:'a'.repeat(64)};
+  const compiled=await challengeLadder('source',0,[25,25,25,25],store,online,()=>{},()=>{});
+  await compiled.close();assert.deepEqual(statuses,['offline','online']);
+  await assert.rejects(challengeLadder('source',0,[25,25,25,25],store,offline,()=>{},()=>{}),/选手不可用/);
+  assert.deepEqual(statuses,['offline','online']);
 })().catch(error=>{console.error(error);process.exitCode=1;});
