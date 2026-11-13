@@ -23,6 +23,17 @@ if(config.supabase){
   logout.onclick=()=>{void auth.signOut().then(({error})=>{if(error)status.textContent='退出登录失败，请重试。';}).catch(()=>{status.textContent='退出登录失败，请重试。';});};
   function updateKind(){const isSource=(form.elements.namedItem('submit-kind') as RadioNodeList).value==='source';document.getElementById('submit-source-field')!.hidden=!isSource;document.getElementById('submit-mcp-field')!.hidden=isSource;endpoint.disabled=isSource;file.disabled=!isSource;file.required=isSource;}
   form.querySelectorAll<HTMLInputElement>('input[name=submit-kind]').forEach(input=>input.onchange=updateKind);updateKind();
+  const progressBox=document.getElementById('upload-progress') as HTMLElement,progressBar=document.getElementById('upload-progress-bar') as HTMLProgressElement,progressLabel=document.getElementById('upload-progress-label') as HTMLElement,progressPercent=document.getElementById('upload-progress-percent') as HTMLElement,progressSpeed=document.getElementById('upload-progress-speed') as HTMLElement,progressEta=document.getElementById('upload-progress-eta') as HTMLElement;
+  const formatBytes=(value:number)=>value<1024?`${value.toFixed(0)} B`:value<1024*1024?`${(value/1024).toFixed(1)} KB`:`${(value/1024/1024).toFixed(1)} MB`;
+  const formatDuration=(seconds:number)=>{if(!Number.isFinite(seconds)||seconds<0)return '预计剩余时间计算中';const rounded=Math.ceil(seconds);return rounded<60?`约 ${rounded} 秒剩余`:`约 ${Math.floor(rounded/60)} 分 ${rounded%60} 秒剩余`;};
+  const now=()=>typeof performance==='undefined'?Date.now():performance.now();
+  let uploadStarted=0;
+  function showUploadProgress(loaded:number,total:number,finished=false){
+    if(!progressBox||!progressBar)return;
+    const ratio=total>0?Math.max(0,Math.min(1,loaded/total)):0,percent=Math.round(ratio*100),elapsed=uploadStarted?Math.max(.001,(now()-uploadStarted)/1000):0,speed=elapsed?loaded/elapsed:0;
+    progressBox.hidden=false;progressBox.classList.toggle('is-complete',finished);progressBox.classList.remove('is-error');progressBar.value=percent;progressPercent.textContent=`${percent}%`;progressLabel.textContent=finished?'上传完成':percent?'正在上传…':'准备上传…';progressSpeed.textContent=speed?`${formatBytes(speed)}/s`:'等待开始';progressEta.textContent=finished?'':formatDuration(speed?(total-loaded)/speed:NaN);
+  }
+  function failUploadProgress(){if(!progressBox)return;progressBox.hidden=false;progressBox.classList.remove('is-complete');progressBox.classList.add('is-error');progressLabel.textContent='上传失败';progressSpeed.textContent='可以重新提交';progressEta.textContent='';}
   async function request(path:string,session:Session,init:RequestInit={}){
     if(!base)throw Error('天梯提交尚未开放。');
     const response=await fetch(base+path,{...init,redirect:'error',headers:{...init.headers,Authorization:'Bearer '+session.access_token}});
@@ -31,6 +42,15 @@ if(config.supabase){
     return result;
   }
   function remember(id:string){if(watching!==id){generation++;clearTimeout(timer);watching=null;}trackedId=id;sessionStorage.setItem('qiling-submission-id',id);}
+  function uploadSource(path:string,session:Session,bytes:ArrayBuffer,onProgress:(loaded:number,total:number)=>void){
+    if(typeof XMLHttpRequest==='undefined')return request(path,session,{method:'PUT',headers:{'Content-Type':'application/octet-stream'},body:bytes});
+    return new Promise<{id?:unknown}>((resolve,reject)=>{
+      const xhr=new XMLHttpRequest();xhr.open('PUT',base+path);xhr.setRequestHeader('Authorization','Bearer '+session.access_token);xhr.setRequestHeader('Content-Type','application/octet-stream');
+      xhr.upload.onprogress=event=>{if(event.lengthComputable)onProgress(event.loaded,event.total);};
+      xhr.onload=()=>{const result=JSON.parse(xhr.responseText||'null') as {id?:unknown;error?:unknown}|null;if(xhr.status>=200&&xhr.status<300)resolve(result||{});else reject(Error(typeof result?.error==='string'?result.error:'上传失败，请稍后再试。'));};
+      xhr.onerror=()=>reject(Error('网络中断，上传状态暂不确定。'));xhr.ontimeout=()=>reject(Error('上传超时，上传状态暂不确定。'));xhr.timeout=10*60*1000;xhr.send(bytes);
+    });
+  }
   function watch(id:string){if(watching===id)return;watching=id;const current=++generation;clearTimeout(timer);timer=setTimeout(()=>{void poll(id,current);},0);}
   async function poll(id:string,current:number){
     try{
@@ -57,7 +77,7 @@ if(config.supabase){
           const bytes=await selected.arrayBuffer();const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(n=>n.toString(16).padStart(2,'0')).join('');
           result=await request('/api/submissions/source',session,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,author,filename:selected.name,sha256:digest,size:selected.size})});
           if(typeof result?.id!=='string')throw Error('提交暂时不可用。');reservation=result.id;remember(reservation);
-          transferStarted=true;result=await request('/api/submissions/source/'+encodeURIComponent(reservation),session,{method:'PUT',headers:{'Content-Type':'application/octet-stream'},body:bytes});
+          transferStarted=true;uploadStarted=now();showUploadProgress(0,selected.size);result=await uploadSource('/api/submissions/source/'+encodeURIComponent(reservation),session,bytes,(loaded,total)=>showUploadProgress(loaded,total));showUploadProgress(selected.size,selected.size,true);
           reservation=null;
         }else{
           const url=new URL(endpoint.value);if(url.protocol!=='https:')throw Error('请填写公网 HTTPS 地址。');
@@ -71,6 +91,6 @@ if(config.supabase){
         if(reservation&&!transferStarted){trackedId=null;sessionStorage.removeItem('qiling-submission-id');void request('/api/submissions/source/'+encodeURIComponent(reservation),session,{method:'DELETE'}).catch(()=>{});}
         throw error;
       }
-    })().catch(error=>{status.textContent=error instanceof Error?error.message:'提交暂时不可用。';}).finally(()=>{button.disabled=false;});
+    })().catch(error=>{if(file.files?.length)failUploadProgress();status.textContent=error instanceof Error?error.message:'提交暂时不可用。';}).finally(()=>{button.disabled=false;});
   };
 }else{login.disabled=true;status.textContent='登录服务暂时不可用。';}
